@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Location History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        header .container {
+            padding: 20px 0;
+        }
+        header .logo img {
+            height: 60px; /* Adjust as needed */
+        }
+        header nav ul li a {
+            font-size: 18px; /* Increase font size */
+        }
+        .data-table {
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+            font-family: sans-serif;
+            min-width: 400px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        }
+        .data-table thead tr {
+            background-color: #007bff; /* Blue for header */
+            color: #fff;
+            text-align: left;
+        }
+        .data-table tbody tr.active-row {
+            font-weight: bold;
+            color: #007bff; /* Blue for active row */
+        }
+        .data-table tbody tr {
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table tbody tr:nth-of-type(even) {
+            background-color: #f9fafc; /* Light blue for even rows */
+        }
+        .data-table tbody tr:last-of-type {
+            border-bottom: 2px solid #007bff; /* Blue for bottom border */
+        }
+    </style>
+</head>
+<body>
+<header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Location</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main class="container">
+        <h1>Terminal Location History</h1>
+        <form id="terminalForm">
+            <label for="terminalSelect">Select Terminal:</label>
+            <select id="terminalSelect" name="terminal">
+                <option value="">Select a terminal</option>
+            </select>
+            <label for="timeframeSelect">Select Timeframe (hours):</label>
+            <select id="timeframeSelect" name="timeframe">
+                <option value="1">1 hour</option>
+                <option value="6">6 hours</option>
+                <option value="12">12 hours</option>
+                <option value="24">24 hours</option>
+                <option value="48">48 hours</option>
+            </select>
+            <button type="submit">Show History</button>
+        </form>
+        <table id="historyTable" class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>District</th>
+                    <th>State</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </main>
+    <footer>
+        <div class="container">
+            <ul>
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Terms of Service</a></li>
+                <li><a href="#">Contact</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        // Fetch terminal options on page load
+        fetch('/api/terminals')
+            .then(response => response.json())
+            .then(terminals => {
+                const terminalSelect = document.getElementById('terminalSelect');
+                terminals.forEach(terminal => {
+                    const option = document.createElement('option');
+                    option.value = terminal.id;
+                    option.textContent = terminal.name;
+                    terminalSelect.appendChild(option);
+                });
+            });
+
+        // Handle form submission
+        document.getElementById('terminalForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const terminal = document.getElementById('terminalSelect').value;
+            const timeframe = document.getElementById('timeframeSelect').value;
+            fetch(`/api/terminal-data?terminal=${terminal}&timeframe=${timeframe}`)
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('historyTable').querySelector('tbody');
+                    tableBody.innerHTML = '';
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.Timestamp}</td>
+                            <td>${row.Latitude}</td>
+                            <td>${row.Longitude}</td>
+                            <td>${row.District}</td>
+                            <td>${row.State}</td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                });
+        });
+    </script>
+</body>
+</html>
+

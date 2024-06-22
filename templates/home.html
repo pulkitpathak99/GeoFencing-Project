@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[Your Project Name] Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="static/css/styles.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="https://unpkg.com/animejs@v3/dist/anime.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha512-+A4qFy8dBvJz9nQBRqpLNvowOTailSLC/QGtznGYwkStStzCUzLHwBmRnz6j/RM2CwvbYWzQyJg2+/AtCtvgbA==" crossorigin=""></script>
+
+  <style>
+    /* Include your custom styles for the homepage layout and animations here */
+
+    .hero {
+      background-image: url("static/images/hero-bg.jpg"); /* Replace with your background image */
+      background-size: cover;
+      background-position: center;
+      padding: 100px 0;
+      color: #fff;
+      text-align: center; /* Adjust as needed */
+    }
+
+    .hero h1 {
+      font-size: 3em;
+      margin-bottom: 20px;
+      animation: fade-in 2s ease-in-out forwards;
+    }
+
+    .hero p {
+      font-size: 1.2em;
+      line-height: 1.5;
+      animation: fade-in 2s ease-in-out 0.5s forwards;
+    }
+
+    .hero .btn {
+      background-color: #007bff;
+      color: #fff;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      margin-top: 20px;
+      animation: button-pop 0.8s ease-in-out forwards;
+    }
+
+    .hero .btn:hover {
+      background-color: #0069d9;
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes button-pop {
+      from { transform: scale(0.9); }
+      to { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">
+        <a href="#"><img src="static/images/logo.png" alt="Logo"></a>
+      </div>
+      <nav>
+        <ul>
+          <li class="active"><a href="/">Home</a></li>
+          <li><a href="/map">Map</a></li>
+          <li><a href="/latest-data">Data</a></li>
+          <li><a href="/path">View Terminal Path</a></li>
+          <li><a href="/terminal">Terminal History</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Welcome to [Your Project Name] Dashboard</h1>
+        <p>Gain real-time insights into your terminal network across India. Our interactive platform allows you to monitor location data, analyze trends, and optimize operations.</p>
+        <a href="/latest-data" class="btn btn-primary">Explore Live Data</a>
+
+                  <div class="info-box">
+            <i class="fas fa-map-marker-alt"></i>
+            <span class="counter" data-target="100">0</span>
+            <h3>Terminals Monitored</h3>
+            <p>Track the real-time location and status of all your terminals across India.</p>
+          </div>
+          <div class="info-box">
+            <i class="fas fa-signal"></i>
+            <span class="counter" data-target="98.5">0</span>
+            <h3>Average Signal Strength</h3>
+            <p>Monitor signal strength for optimal performance and identify potential connectivity issues.</p>
+          </div>
+          <div class="info-box">
+            <i class="fas fa-chart-line"></i>
+            <span class="counter" data-target="25">0</span>
+            <h3>Recent Alerts</h3>
+            <p>Stay informed about critical events and potential problems in your network.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 [Your Company Name]</p>
+    </div>
+  </footer>
+
+  <script>
+    const counters = document.querySelectorAll('.counter');
+    const speed = 2000; // Adjust animation speed as needed
+
+    counters.forEach(counter => {
+      const target = counter.dataset.target;
+      const element = counter;
+
+      anime({
+        targets: element,
+        textContent: [0, target],
+        easing: 'linear',
+        duration: speed,
+        round: 1,
+      });
+    });
+  </script>
+</body>
+</html>
+

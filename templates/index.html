@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Current Terminal Location</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        #map {
+            height: 600px;
+            margin-top: 20px;
+        }
+        header .container {
+            padding: 20px 0;
+        }
+        header .logo img {
+            height: 60px; /* Adjust as needed */
+        }
+        header nav ul li a {
+            font-size: 18px; /* Increase font size */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Location</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Current Terminal Location</h1>
+        <table class="data-table">
+  <thead>
+    <tr>
+      <th>Timestamp</th>
+      <th>SAI</th>
+      <th>Device Id</th>
+      <th>Latitude</th>
+      <th>Longitude</th>
+      <th>District</th>
+      <th>State</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in data %}
+    <tr>
+      <td class="timestamp">{{ row.Timestamp }}</td>
+      <td class="sai">{{ row.SAI }}</td>
+      <td class="device-id">{{ row.Device_Id }}</td>
+      <td class="latitude">{{ row.Latitude }}</td>
+      <td class="longitude">{{ row.Longitude }}</td>
+      <td class="district">{{ row.District }}</td>
+      <td class="state">{{ row.State }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<style>
+  /* Include your existing styles for .data-table if any */
+
+  .data-table thead tr {
+    background-color: #007bff; /* Blue for header */
+    color: #fff;
+    text-align: left;
+  }
+
+  .data-table tbody tr.active-row {
+    font-weight: bold;
+    color: #007bff; /* Blue for active row */
+  }
+
+  .data-table tbody tr {
+    border-bottom: 1px solid #ddd;
+  }
+
+  .data-table tbody tr:nth-of-type(even) {
+    background-color: #f9fafc; /* Light blue for even rows */
+  }
+
+  .data-table tbody tr:last-of-type {
+    border-bottom: 2px solid #007bff; /* Blue for bottom border */
+  }
+</style>
+
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <ul>
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Terms of Service</a></li>
+                <li><a href="#">Contact</a></li>
+            </ul>
+        </div>
+    </footer>
+</body>
+</html>
+

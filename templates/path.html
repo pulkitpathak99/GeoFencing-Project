@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal Path Viewer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+  #map {
+            height: 600px;
+            margin-top: 20px;
+        }
+        header .container {
+            padding: 20px 0;
+        }
+        header .logo img {
+            height: 60px; /* Adjust as needed */
+        }
+        header nav ul li a {
+            font-size: 18px; /* Increase font size */
+        }
+  </style>
+</head>
+<body>
+  <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+  <h1>Terminal Path Viewer</h1>
+  <form id="terminal-form">
+    <label for="terminal">Select Terminal:</label>
+    <select id="terminal" name="terminal">
+      <option value="" selected disabled>Select terminal</option>
+    </select>
+
+    <label for="timeframe">Select Timeframe:</label>
+    <select id="timeframe" name="timeframe">
+      <option value="24">Last 24 hours</option>
+      <option value="48">Last Week</option>
+      <option value="72">Last month</option>
+    </select>
+
+    <label for="show-path-markers">
+      <input type="checkbox" id="show-path-markers"> Show Path Markers
+    </label>
+
+    <button type="submit">Show Path</button>
+  </form>
+
+  <div id="map"></div>
+
+  <div id="loading-indicator" style="display:none;">Loading...</div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+  const map = L.map('map').setView([20.5937, 78.9629], 5);
+  L.tileLayer('https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
+    attribution: '&copy; <a href="https://www.maptiler.com/copyright">MapTiler</a> contributors'
+  }).addTo(map);
+
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const terminalSelect = document.getElementById('terminal');
+  const showPathMarkersCheckbox = document.getElementById('show-path-markers');
+
+  fetch('/api/terminals')
+    .then(response => response.json())
+    .then(data => {
+      const uniqueTerminals = new Set();
+      data.forEach(terminal => {
+        if (!uniqueTerminals.has(terminal.id)) {
+          uniqueTerminals.add(terminal.id);
+          const option = document.createElement('option');
+          option.value = terminal.id;
+          option.textContent = terminal.name;
+          terminalSelect.appendChild(option);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('Error fetching terminals:', error);
+      alert('Failed to load terminals.');
+    });
+
+  document.getElementById('terminal-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const terminalId = terminalSelect.value;
+    const timeframe = document.getElementById('timeframe').value;
+    if (!terminalId || !timeframe) {
+      alert('Please select a terminal and a timeframe.');
+      return;
+    }
+
+    loadingIndicator.style.display = 'block';
+    fetch(`/api/path?terminal=${terminalId}&timeframe=${timeframe}`)
+      .then(response => response.json())
+      .then(data => {
+        loadingIndicator.style.display = 'none';
+        const path = data.map(point => [point.latitude, point.longitude]);
+        if (showPathMarkersCheckbox.checked) {
+          const markers = L.markerClusterGroup();
+          path.forEach(point => {
+            markers.addLayer(L.marker(point));
+          });
+          map.addLayer(markers);
+        } else {
+          const polyline = L.polyline(path, { color: 'blue', dashArray: '5, 10' }).addTo(map); // Update with dashArray
+          map.fitBounds(polyline.getBounds());
+        }
+      })
+      .catch(error => {
+        loadingIndicator.style.display = 'none';
+        console.error('Error fetching path:', error);
+        alert('Failed to load path.');
+      });
+  });
+
+    });
+  </script>
+</body>
+</html>
+

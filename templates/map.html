@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map View</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        #map {
+            height: 600px;
+            margin-top: 20px;
+        }
+        header .container {
+            padding: 20px 0;
+        }
+        header .logo img {
+            height: 60px; /* Adjust as needed */
+        }
+        header nav ul li a {
+            font-size: 18px; /* Increase font size */
+        }
+        .selectors {
+            margin: 20px 0;
+        }
+        .selectors select {
+            margin-right: 10px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Map View</h1>
+        <div class="selectors">
+            <select id="stateSelect">
+                <option value="">Select State</option>
+            </select>
+            <select id="districtSelect" disabled>
+                <option value="">Select District</option>
+            </select>
+        </div>
+        <div id="map"></div>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var map = L.map('map').setView([20.5937, 78.9629], 5); // Centered on India
+
+            L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
+                attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> contributors'
+            }).addTo(map);
+
+            var stateSelect = document.getElementById('stateSelect');
+            var districtSelect = document.getElementById('districtSelect');
+
+            function populateSelect(selectElement, items) {
+                selectElement.innerHTML = '<option value="">Select</option>';
+                items.forEach(item => {
+                    var option = document.createElement('option');
+                    option.value = item;
+                    option.text = item;
+                    selectElement.appendChild(option);
+                });
+            }
+
+            function fetchStatesAndDistricts() {
+                axios.get('/api/states')
+                    .then(response => {
+                        var states = response.data;
+                        populateSelect(stateSelect, states);
+                    })
+                    .catch(error => console.error(error));
+            }
+
+            function fetchDistricts(state) {
+                axios.get('/api/districts', { params: { state: state } })
+                    .then(response => {
+                        var districts = response.data;
+                        populateSelect(districtSelect, districts);
+                        districtSelect.disabled = false;
+                    })
+                    .catch(error => console.error(error));
+            }
+
+            function fetchTerminals(state = "", district = "") {
+                axios.get('/api/terminals', { params: { state: state, district: district } })
+                    .then(response => {
+                        var terminals = response.data;
+                        updateMap(terminals);
+                    })
+                    .catch(error => console.error(error));
+            }
+
+            function updateMap(terminals) {
+                map.eachLayer(function (layer) {
+                    if (!!layer.toGeoJSON) {
+                        map.removeLayer(layer);
+                    }
+                });
+
+                L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
+                    attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> contributors'
+                }).addTo(map);
+
+                terminals.forEach(item => {
+                    L.marker([item.Latitude, item.Longitude]).addTo(map)
+                        .bindPopup(`<b>Device ID:</b> ${item.Device_Id}<br>
+                                    <b>Timestamp:</b> ${item.Timestamp}<br>
+                                    <b>SAI:</b> ${item.SAI}<br>
+                                    <b>District:</b> ${item.District}<br>
+                                    <b>State:</b> ${item.State}`);
+                });
+            }
+
+            stateSelect.addEventListener('change', function () {
+                var state = stateSelect.value;
+                if (state) {
+                    fetchDistricts(state);
+                    fetchTerminals(state);
+                } else {
+                    districtSelect.disabled = true;
+                    districtSelect.innerHTML = '<option value="">Select District</option>';
+                    fetchTerminals();
+                }
+            });
+
+            districtSelect.addEventListener('change', function () {
+                var state = stateSelect.value;
+                var district = districtSelect.value;
+                fetchTerminals(state, district);
+            });
+
+            fetchStatesAndDistricts();
+            fetchTerminals();
+        });
+    </script>
+</body>
+</html>
+
