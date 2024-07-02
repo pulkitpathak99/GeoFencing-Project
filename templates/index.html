@@ -1,26 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="10">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Current Terminal Location</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-        #map {
-            height: 600px;
-            margin-top: 20px;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: #333;
         }
-        header .container {
+
+        header {
+            background-color: #003366;
+            color: white;
             padding: 20px 0;
         }
-        header .logo img {
-            height: 60px; /* Adjust as needed */
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
+
+        header .logo img {
+            height: 60px;
+        }
+
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
+
+        header nav ul li {
+            margin-left: 20px;
+        }
+
         header nav ul li a {
-            font-size: 18px; /* Increase font size */
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+        }
+
+        header nav ul li a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: #003366;
+            text-align: center;
+            padding-bottom: 20px;
+        }
+
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .filter-container select {
+            margin-right: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .actions-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+        }
+
+        #exportButton {
+            padding: 10px 20px;
+            background-color: #003366;
+            color: white;
+            border: none;
+            max-width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #exportButton:hover {
+            background-color: #002244;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #003366;
+            color: white;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tbody tr:hover {
+            background-color: #f0f0f0;
+        }
+
+        footer {
+            background-color: #003366;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+
+        footer ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        footer ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        footer ul li a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
+
 <body>
     <header>
         <div class="container">
@@ -31,82 +168,105 @@
                 <ul>
                     <li><a href="{{ url_for('home') }}">Home</a></li>
                     <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
-                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
-                    <li><a href="/path">Track Location</a></li>
+                    <li><a id="mapLink" href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
                     <li><a href="/terminal">Terminal History</a></li>
+                    <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
                 </ul>
             </nav>
         </div>
     </header>
 
-    <main class="container">
+    <main>
         <h1>Current Terminal Location</h1>
-        <table class="data-table">
-  <thead>
-    <tr>
-      <th>Timestamp</th>
-      <th>SAI</th>
-      <th>Device Id</th>
-      <th>Latitude</th>
-      <th>Longitude</th>
-      <th>District</th>
-      <th>State</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in data %}
-    <tr>
-      <td class="timestamp">{{ row.Timestamp }}</td>
-      <td class="sai">{{ row.SAI }}</td>
-      <td class="device-id">{{ row.Device_Id }}</td>
-      <td class="latitude">{{ row.Latitude }}</td>
-      <td class="longitude">{{ row.Longitude }}</td>
-      <td class="district">{{ row.District }}</td>
-      <td class="state">{{ row.State }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<style>
-  /* Include your existing styles for .data-table if any */
-
-  .data-table thead tr {
-    background-color: #007bff; /* Blue for header */
-    color: #fff;
-    text-align: left;
-  }
-
-  .data-table tbody tr.active-row {
-    font-weight: bold;
-    color: #007bff; /* Blue for active row */
-  }
-
-  .data-table tbody tr {
-    border-bottom: 1px solid #ddd;
-  }
-
-  .data-table tbody tr:nth-of-type(even) {
-    background-color: #f9fafc; /* Light blue for even rows */
-  }
-
-  .data-table tbody tr:last-of-type {
-    border-bottom: 2px solid #007bff; /* Blue for bottom border */
-  }
-</style>
-
-
+        <div class="actions-container">
+            <button id="exportButton">Export as CSV</button>
+        </div>
+        <div></div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>SAI</th>
+                    <th>Device ID</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>District</th>
+                    <th>State</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if data %}
+                {% for row in data %}
+                <tr>
+                    <td>{{ row.Timestamp }}</td>
+                    <td>{{ row.SAI }}</td>
+                    <td>{{ row.Device_Id }}</td>
+                    <td>{{ row.Latitude }}</td>
+                    <td>{{ row.Longitude }}</td>
+                    <td>{{ row.District }}</td>
+                    <td>{{ row.State }}</td>
+                    <td>{{ row.Status}}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8">No data available</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </main>
 
     <footer>
         <div class="container">
             <ul>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Terms</a></li>
                 <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
-                <li><a href="#">Contact</a></li>
+                <li><a href="#">Contact Us</a></li>
             </ul>
         </div>
     </footer>
-</body>
-</html>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const historyTableBody = document.querySelector('tbody');
+            const exportButton = document.getElementById('exportButton');
+
+            // Function to download CSV file
+            function downloadCSV(csv, filename) {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const downloadLink = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                downloadLink.setAttribute('href', url);
+                downloadLink.setAttribute('download', filename);
+                downloadLink.style.display = 'none';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }
+
+            // Event listener for export button
+            exportButton.addEventListener('click', function () {
+                const rows = historyTableBody.querySelectorAll('tr');
+
+                // Prepare CSV header
+                let csv = 'Timestamp,SAI,Device ID,Latitude,Longitude,District,State,Status\n';
+
+                // Generate CSV content from table rows
+                rows.forEach(row => {
+                    const rowData = Array.from(row.children).map(td => td.textContent).join(',');
+                    csv += rowData + '\n';
+                });
+
+                // Download CSV file
+                const filename = 'current_terminal_location.csv';
+                downloadCSV(csv, filename);
+            });
+        });
+    </script>
+</body>
+
+</html>

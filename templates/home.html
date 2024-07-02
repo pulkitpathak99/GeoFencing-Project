@@ -1,134 +1,298 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>[Your Project Name] Dashboard</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-  <link rel="stylesheet" href="static/css/styles.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <script src="https://unpkg.com/animejs@v3/dist/anime.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha512-+A4qFy8dBvJz9nQBRqpLNvowOTailSLC/QGtznGYwkStStzCUzLHwBmRnz6j/RM2CwvbYWzQyJg2+/AtCtvgbA==" crossorigin=""></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Tracking Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: #333;
+        }
 
-  <style>
-    /* Include your custom styles for the homepage layout and animations here */
+        header {
+            background-color: #003366;
+            color: white;
+            padding: 20px 0;
+        }
 
-    .hero {
-      background-image: url("static/images/hero-bg.jpg"); /* Replace with your background image */
-      background-size: cover;
-      background-position: center;
-      padding: 100px 0;
-      color: #fff;
-      text-align: center; /* Adjust as needed */
-    }
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
 
-    .hero h1 {
-      font-size: 3em;
-      margin-bottom: 20px;
-      animation: fade-in 2s ease-in-out forwards;
-    }
+        header .logo img {
+            height: 60px;
+        }
 
-    .hero p {
-      font-size: 1.2em;
-      line-height: 1.5;
-      animation: fade-in 2s ease-in-out 0.5s forwards;
-    }
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
 
-    .hero .btn {
-      background-color: #007bff;
-      color: #fff;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      margin-top: 20px;
-      animation: button-pop 0.8s ease-in-out forwards;
-    }
+        header nav ul li {
+            margin-left: 20px;
+        }
 
-    .hero .btn:hover {
-      background-color: #0069d9;
-    }
+        header nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+        }
 
-    @keyframes fade-in {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
+        header nav ul li a:hover {
+            text-decoration: underline;
+        }
 
-    @keyframes button-pop {
-      from { transform: scale(0.9); }
-      to { transform: scale(1); }
-    }
-  </style>
+        main {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.2em;
+            margin-bottom: 40px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .button-container a {
+            display: inline-block;
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 18px;
+            color: white;
+            background-color: #007bff;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+
+        .button-container a:hover {
+            background-color: #0056b3;
+            transform: translateY(-3px);
+        }
+
+        .icon {
+            margin-right: 10px;
+        }
+
+        footer {
+            background-color: #003366;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+
+        footer ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        footer ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        footer ul li a:hover {
+            text-decoration: underline;
+        }
+
+        .loading-indicator {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            color: #003366;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.3s;
+        }
+
+        .loading-indicator.active {
+            display: block;
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            header .container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            form {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            footer ul {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        .features {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .feature {
+            flex: 1 1 30%;
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            text-align: left;
+        }
+
+        .feature:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+
+        .feature p {
+            color: #555;
+        }
+
+        .feature i {
+            font-size: 2em;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+
+        .loading-indicator {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            color: #003366;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.3s;
+        }
+
+        .loading-indicator.active {
+            display: block;
+            opacity: 1;
+        }
+    </style>
 </head>
+
 <body>
-  <header>
-    <div class="container">
-      <div class="logo">
-        <a href="#"><img src="static/images/logo.png" alt="Logo"></a>
-      </div>
-      <nav>
-        <ul>
-          <li class="active"><a href="/">Home</a></li>
-          <li><a href="/map">Map</a></li>
-          <li><a href="/latest-data">Data</a></li>
-          <li><a href="/path">View Terminal Path</a></li>
-          <li><a href="/terminal">Terminal History</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
-  <main>
-    <section class="hero">
-      <div class="container">
-        <h1>Welcome to [Your Project Name] Dashboard</h1>
-        <p>Gain real-time insights into your terminal network across India. Our interactive platform allows you to monitor location data, analyze trends, and optimize operations.</p>
-        <a href="/latest-data" class="btn btn-primary">Explore Live Data</a>
-
-                  <div class="info-box">
-            <i class="fas fa-map-marker-alt"></i>
-            <span class="counter" data-target="100">0</span>
-            <h3>Terminals Monitored</h3>
-            <p>Track the real-time location and status of all your terminals across India.</p>
-          </div>
-          <div class="info-box">
-            <i class="fas fa-signal"></i>
-            <span class="counter" data-target="98.5">0</span>
-            <h3>Average Signal Strength</h3>
-            <p>Monitor signal strength for optimal performance and identify potential connectivity issues.</p>
-          </div>
-          <div class="info-box">
-            <i class="fas fa-chart-line"></i>
-            <span class="counter" data-target="25">0</span>
-            <h3>Recent Alerts</h3>
-            <p>Stay informed about critical events and potential problems in your network.</p>
-          </div>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                    <li><a href="/control">Control Terminals</a></li>
+                </ul>
+            </nav>
         </div>
-      </div>
-    </section>
-  </main>
-  <footer>
-    <div class="container">
-      <p>&copy; 2024 [Your Company Name]</p>
-    </div>
-  </footer>
-
-  <script>
-    const counters = document.querySelectorAll('.counter');
-    const speed = 2000; // Adjust animation speed as needed
-
-    counters.forEach(counter => {
-      const target = counter.dataset.target;
-      const element = counter;
-
-      anime({
-        targets: element,
-        textContent: [0, target],
-        easing: 'linear',
-        duration: speed,
-        round: 1,
-      });
-    });
-  </script>
+    </header>
+    <main>
+        <h1>Welcome to Terminal Tracking System</h1>
+        <p>Monitor and track the real-time location of terminals, view their paths, and access detailed history with this comprehensive terminal tracking system.</p>
+        <div class="button-container">
+            <a href="{{ url_for('get_latest_data') }}"><i class="fas fa-map-marker-alt icon"></i> Current Location</a>
+            <a href="{{ url_for('map_page') }}"><i class="fas fa-map icon"></i> Map View</a>
+            <a href="/path"><i class="fas fa-route icon"></i> Track Path</a>
+            <a href="/terminal"><i class="fas fa-history icon"></i> Terminal History</a>
+            <a href="/control"><i class="fas fa-pencil icon"></i> Control Terminals</a>
+        </div>
+        <div class="features">
+            <div class="feature">
+                <i class="fa fa-location-arrow"></i>
+                <h3>Current Location</h3>
+                <p>View the current locations of all terminals in real-time.</p>
+            </div>
+            <div class="feature">
+                <i class="fa fa-map"></i>
+                <h3>Map View</h3>
+                <p>Visualize terminal locations on an interactive map with filtering options.</p>
+            </div>
+            <div class="feature">
+                <i class="fa-sharp fa-regular fa-route"></i>
+                <h3>Track Path</h3>
+                <p>Track the movement path of terminals over a specified period.</p>
+            </div>
+            <div class="feature">
+                <i class="fa fa-history"></i>
+                <h3>Terminal History</h3>
+                <p>Access historical data and activity logs of individual terminals.</p>
+            </div>
+            <div class="feature">
+                <i class="fa fa-pencil"></i>
+                <h3>Control Terminals</h3>
+                <p>Interact with terminals at a district administrative level</p>
+        </div>
+    </main>
+    <footer>
+        <ul>
+            <li><a href="{{ url_for('home') }}">Home</a></li>
+            <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+            <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+            <li><a href="/path">Track Path</a></li>
+            <li><a href="/terminal">Terminal History</a></li>
+            <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
+        </ul>
+    </footer>
 </body>
-</html>
 
+</html>

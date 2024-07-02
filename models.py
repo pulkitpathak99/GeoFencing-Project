@@ -1,33 +1,48 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.mysql import VARCHAR
 
+# Initialize the database
 db = SQLAlchemy()
 
 class TerminalData(db.Model):
     __tablename__ = 'terminal_data'
     
-    Timestamp = db.Column(db.DateTime, primary_key=True)
-    SAI = db.Column(db.Integer, nullable=False)
-    Device_Id = db.Column(db.String(255), nullable=False)
-    SBC_Id = db.Column(db.BigInteger, nullable=False)
-    Sequence_Num = db.Column(db.Integer, nullable=False)
-    MLR_Option_Flag = db.Column(db.String(255), nullable=False)
-    Latitude = db.Column(db.Float, nullable=False)
-    Longitude = db.Column(db.Float, nullable=False)
-    District = db.Column(db.String(255), nullable=False)
-    State = db.Column(db.String(255), nullable=False)
-    Velocity = db.Column(db.Float, nullable=False)
-    Track_Angle = db.Column(db.Float, nullable=False)
-    Azimuth = db.Column(db.Float, nullable=False)
-    Elevation = db.Column(db.Float, nullable=False)
-    Rx_Esno = db.Column(db.Float, nullable=False)
-    Tx_Esno = db.Column(db.Float, nullable=False)
-    RateString = db.Column(db.String(255), nullable=False)
-    Modem_Output_Power = db.Column(db.Float, nullable=False)
-    Cal_Ant_EIRP = db.Column(db.Float, nullable=False)
-    MLR_Sat_Beam_Id = db.Column(db.String(255), nullable=False)
-    MBS_Option_Flag = db.Column(db.String(255), nullable=False)
-    MBS_Sat_Beam_Id = db.Column(db.String(255), nullable=False)
-    Error_Index = db.Column(db.Integer, nullable=False)
-    VSAT_MGMT_Addr = db.Column(db.String(255), nullable=False)
-    Num_Msg_Processed = db.Column(db.Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    sai = db.Column(db.String(255), nullable=False)
+    device_id = db.Column(db.String(255), nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    district = db.Column(db.String(255), nullable=False)
+    state = db.Column(db.String(255), nullable=False)
+    
+    def __repr__(self):
+        return f"<TerminalData {self.device_id}>"
 
+class District(db.Model):
+    __tablename__ = 'districts'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    state = db.Column(db.String(255), nullable=False)
+    district = db.Column(db.String(255), nullable=False)
+    geometry = db.Column(db.Text, nullable=False)  # GeoJSON data stored as text
+    
+    def __repr__(self):
+        return f"<District {self.district}, {self.state}>"
+
+class Terminal(db.Model):
+    __tablename__ = 'terminals'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    device_id = db.Column(db.String(255), nullable=False, unique=True)
+    name = db.Column(db.String(255), nullable=False)
+    last_latitude = db.Column(db.Float, nullable=True)
+    last_longitude = db.Column(db.Float, nullable=True)
+    last_timestamp = db.Column(db.DateTime, nullable=True)
+    
+    def __repr__(self):
+        return f"<Terminal {self.device_id}>"
+
+# Utility function to create all tables
+def create_tables():
+    db.create_all()

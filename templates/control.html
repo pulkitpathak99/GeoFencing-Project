@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                    <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main>
+    <h1>Control Page</h1>
+    <div>
+        <label for="state-select">Select State:</label>
+        <select id="state-select">
+            <option value="">Select State</option>
+        </select>
+        <label for="district-select">Select District:</label>
+        <select id="district-select">
+            <option value="">Select District</option>
+        </select>
+        <button id="fetch-terminals">Fetch Terminals</button>
+    </div>
+    <div id="terminals-container">
+        <h2>Terminals in Selected District</h2>
+        <table id="terminals-table">
+            <thead>
+                <tr>
+                    <th>Terminal ID</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <button id="activate-geofence">Activate Geofence</button>
+        <button id="deactivate-geofence">Deactivate Geofence</button>
+    </div>
+    <div id="geofence-status">
+        <h2>Geofence Status</h2>
+        <p id="status-message">No geofence selected</p>
+    </div>
+    <div>
+        <h2>MQTT Terminal Responses</h2>
+        <table id="mqtt-responses-table">
+            <thead>
+                <tr>
+                    <th>Terminal ID</th>
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    </main>
+    <script>
+        $(document).ready(function() {
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+
+            socket.on('geofence_event', function(data) {
+                $('#mqtt-responses-table tbody').append(`
+                    <tr>
+                        <td>${data.terminal_id}</td>
+                        <td>${data.event}</td>
+                        <td>${new Date().toLocaleString()}</td>
+                    </tr>
+                `);
+            });
+
+            // Fetch and populate states in the dropdown
+            $.get('/api/states', function(states) {
+                states.forEach(function(state) {
+                    $('#state-select').append(`<option value="${state}">${state}</option>`);
+                });
+            });
+
+            // Fetch and populate districts based on selected state
+            $('#state-select').change(function() {
+                var state = $(this).val();
+                $('#district-select').empty().append(`<option value="">Select District</option>`);
+                if (state) {
+                    $.get('/api/districts', { state: state }, function(districts) {
+                        districts.forEach(function(district) {
+                            $('#district-select').append(`<option value="${district}">${district}</option>`);
+                        });
+                    });
+                }
+            });
+
+            // Fetch terminals based on selected state and district
+            $('#fetch-terminals').click(function() {
+                var state = $('#state-select').val();
+                var district = $('#district-select').val();
+                if (state && district) {
+                    $.post('/select_district', { state: state, district: district }, function(terminals) {
+                        $('#terminals-table tbody').empty();
+                        terminals.forEach(function(terminal) {
+                            $('#terminals-table tbody').append(`
+                                <tr>
+                                    <td>${terminal.Device_Id}</td>
+                                    <td>${terminal.Latitude}</td>
+                                    <td>${terminal.Longitude}</td>
+                                </tr>
+                            `);
+                        });
+                    });
+                } else {
+                    alert('Please select both state and district');
+                }
+            });
+
+            // Activate geofence for selected district
+            $('#activate-geofence').click(function() {
+                var state = $('#state-select').val();
+                var district = $('#district-select').val();
+                if (state && district) {
+                    $.post('/activate_geofence', { state: state, district: district }, function(response) {
+                        $('#status-message').text(`Geofence activated for ${response.state}, ${response.district}`);
+                    }).fail(function(response) {
+                        alert('Error activating geofence: ' + response.responseJSON.message);
+                    });
+                } else {
+                    alert('Please select both state and district');
+                }
+            });
+
+            // Deactivate geofence for selected district
+            $('#deactivate-geofence').click(function() {
+                var state = $('#state-select').val();
+                var district = $('#district-select').val();
+                if (state && district) {
+                    $.post('/deactivate_geofence', { state: state, district: district }, function(response) {
+                        $('#status-message').text(`Geofence deactivated for ${response.state}, ${response.district}`);
+                    }).fail(function(response) {
+                        alert('Error deactivating geofence: ' + response.responseJSON.message);
+                    });
+                } else {
+                    alert('Please select both state and district');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

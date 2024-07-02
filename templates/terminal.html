@@ -1,50 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Terminal Location History</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-        header .container {
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: #333;
+        }
+
+        header {
+            background-color: #003366;
+            color: white;
             padding: 20px 0;
         }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
         header .logo img {
-            height: 60px; /* Adjust as needed */
+            height: 60px;
         }
+
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
+
+        header nav ul li {
+            margin-left: 20px;
+        }
+
         header nav ul li a {
-            font-size: 18px; /* Increase font size */
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
         }
+
+        header nav ul li a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: #003366;
+            text-align: center;
+            padding-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding-bottom: 20px;
+        }
+
+        form label {
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        form select, form button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        form button {
+            background-color: #003366;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        form button:hover {
+            background-color: #002244;
+        }
+
         .data-table {
+            width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
             font-size: 0.9em;
             font-family: sans-serif;
             min-width: 400px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
+
         .data-table thead tr {
-            background-color: #007bff; /* Blue for header */
-            color: #fff;
+            background-color: #003366;
+            color: white;
             text-align: left;
         }
-        .data-table tbody tr.active-row {
-            font-weight: bold;
-            color: #007bff; /* Blue for active row */
+
+        .data-table th, .data-table td {
+            padding: 12px 15px;
         }
-        .data-table tbody tr {
-            border-bottom: 1px solid #ddd;
+
+        .data-table tbody tr:hover {
+            background-color: #f0f0f0;
         }
+
         .data-table tbody tr:nth-of-type(even) {
-            background-color: #f9fafc; /* Light blue for even rows */
+            background-color: #f9fafc;
         }
+
         .data-table tbody tr:last-of-type {
-            border-bottom: 2px solid #007bff; /* Blue for bottom border */
+            border-bottom: 2px solid #003366;
+        }
+
+        footer {
+            background-color: #003366;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+
+        footer ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        footer ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        footer ul li a:hover {
+            text-decoration: underline;
+        }
+
+        .loading-indicator {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            color: #003366;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.3s;
+        }
+
+        .loading-indicator.active {
+            display: block;
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            header .container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            form {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            footer ul {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
     </style>
 </head>
+
 <body>
-<header>
+    <header>
         <div class="container">
             <div class="logo">
                 <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
@@ -54,29 +212,34 @@
                     <li><a href="{{ url_for('home') }}">Home</a></li>
                     <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
                     <li><a href="{{ url_for('map_page') }}">Map View</a></li>
-                    <li><a href="/path">Track Location</a></li>
+                    <li><a href="/path">Track Path</a></li>
                     <li><a href="/terminal">Terminal History</a></li>
+                    <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <main class="container">
+    <main>
         <h1>Terminal Location History</h1>
         <form id="terminalForm">
             <label for="terminalSelect">Select Terminal:</label>
-            <select id="terminalSelect" name="terminal">
+            <select id="terminalSelect" name="terminal" required>
                 <option value="">Select a terminal</option>
             </select>
             <label for="timeframeSelect">Select Timeframe (hours):</label>
-            <select id="timeframeSelect" name="timeframe">
+            <select id="timeframeSelect" name="timeframe" required>
                 <option value="1">1 hour</option>
                 <option value="6">6 hours</option>
                 <option value="12">12 hours</option>
                 <option value="24">24 hours</option>
                 <option value="48">48 hours</option>
+                <option value="168">Last Week</option>
+                <option value="720">Last Month</option>
             </select>
             <button type="submit">Show History</button>
+            <button type="button" id="exportCSV">Export CSV</button>
         </form>
+        <div id="loadingIndicator" class="loading-indicator">Loading...</div>
         <table id="historyTable" class="data-table">
             <thead>
                 <tr>
@@ -91,53 +254,97 @@
         </table>
     </main>
     <footer>
-        <div class="container">
-            <ul>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
-                <li><a href="#">Contact</a></li>
-            </ul>
-        </div>
+        <ul>
+            <li><a href="{{ url_for('home') }}">Home</a></li>
+            <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+            <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+            <li><a href="/path">Track Path</a></li>
+            <li><a href="/terminal">Terminal History</a></li>
+        </ul>
     </footer>
 
     <script>
-        // Fetch terminal options on page load
-        fetch('/api/terminals')
-            .then(response => response.json())
-            .then(terminals => {
-                const terminalSelect = document.getElementById('terminalSelect');
-                terminals.forEach(terminal => {
-                    const option = document.createElement('option');
-                    option.value = terminal.id;
-                    option.textContent = terminal.name;
-                    terminalSelect.appendChild(option);
-                });
-            });
+        document.addEventListener('DOMContentLoaded', function() {
+            const terminalSelect = document.getElementById('terminalSelect');
+            const historyTableBody = document.getElementById('historyTable').querySelector('tbody');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const exportButton = document.getElementById('exportCSV');
 
-        // Handle form submission
-        document.getElementById('terminalForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const terminal = document.getElementById('terminalSelect').value;
-            const timeframe = document.getElementById('timeframeSelect').value;
-            fetch(`/api/terminal-data?terminal=${terminal}&timeframe=${timeframe}`)
+            fetch('/api/terminals')
                 .then(response => response.json())
-                .then(data => {
-                    const tableBody = document.getElementById('historyTable').querySelector('tbody');
-                    tableBody.innerHTML = '';
-                    data.forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${row.Timestamp}</td>
-                            <td>${row.Latitude}</td>
-                            <td>${row.Longitude}</td>
-                            <td>${row.District}</td>
-                            <td>${row.State}</td>
-                        `;
-                        tableBody.appendChild(tr);
+                .then(terminals => {
+                    terminals.forEach(terminal => {
+                        const option = document.createElement('option');
+                        option.value = terminal.id;
+                        option.textContent = terminal.name;
+                        terminalSelect.appendChild(option);
                     });
                 });
+
+            document.getElementById('terminalForm').addEventListener('submit', function(event) {
+                event.preventDefault();
+                const terminal = terminalSelect.value;
+                const timeframe = document.getElementById('timeframeSelect').value;
+                if (!terminal || !timeframe) {
+                    alert('Please select a terminal and a timeframe.');
+                    return;
+                }
+
+                loadingIndicator.classList.add('active');
+                fetch('/api/terminal-data?terminal=' + terminal + '&timeframe=' + timeframe)
+                    .then(response => response.json())
+                    .then(data => {
+                        loadingIndicator.classList.remove('active');
+                        historyTableBody.innerHTML = '';
+                        data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>${row.Timestamp}</td>
+                                <td>${row.Latitude}</td>
+                                <td>${row.Longitude}</td>
+                                <td>${row.District}</td>
+                                <td>${row.State}</td>
+                            `;
+                            historyTableBody.appendChild(tr);
+                        });
+                    })
+                    .catch(error => {
+                        loadingIndicator.classList.remove('active');
+                        alert('Failed to load terminal data.');
+                        console.error('Error fetching terminal data:', error);
+                    });
+            });
+
+            // Function to download CSV file
+            function downloadCSV(csv, filename) {
+                const csvFile = new Blob([csv], { type: 'text/csv' });
+                const downloadLink = document.createElement('a');
+                downloadLink.download = filename;
+                downloadLink.href = window.URL.createObjectURL(csvFile);
+                downloadLink.style.display = 'none';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }
+
+            // Export table data to CSV
+            exportButton.addEventListener('click', function() {
+                const rows = historyTableBody.querySelectorAll('tr');
+
+                // Prepare CSV header
+                let csv = 'Timestamp, Latitude, Longitude, District, State\n';
+
+                // Generate CSV content from table rows
+                rows.forEach(row => {
+                    const rowData = Array.from(row.children).map(td => td.textContent).join(',');
+                    csv += rowData + '\n';
+                });
+
+                // Download CSV file
+                const filename = 'terminal_history.csv';
+                downloadCSV(csv, filename);
+            });
         });
     </script>
 </body>
 </html>
-
