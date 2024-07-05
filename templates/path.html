@@ -161,7 +161,7 @@
           <li><a href="{{ url_for('map_page') }}">Map View</a></li>
           <li><a href="/path">Track Path</a></li>
           <li><a href="/terminal">Terminal History</a></li>
-          <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
+          <li><a href="/control">Control Terminals</a></li>
         </ul>
       </nav>
     </div>
@@ -177,6 +177,7 @@
 
       <label for="timeframe">Select Timeframe:</label>
       <select id="timeframe" name="timeframe">
+        <option value="1"> Last Hour</option>
         <option value="24">Last 24 hours</option>
         <option value="48">Last 48 hours</option>
         <option value="168">Last Week</option>

@@ -7,6 +7,7 @@
     <title>Terminal Tracking Home</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -52,7 +53,8 @@
             font-size: 18px;
         }
 
-        header nav ul li a:hover {
+        header nav ul li a:hover,
+        header nav ul li a.active {
             text-decoration: underline;
         }
 
@@ -90,7 +92,7 @@
             margin: 10px;
             font-size: 18px;
             color: white;
-            background-color: #007bff;
+            background-color: #003366;
             border-radius: 8px;
             text-decoration: none;
             transition: background-color 0.3s, transform 0.3s;
@@ -205,26 +207,6 @@
             margin-bottom: 10px;
         }
 
-        .loading-indicator {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 18px;
-            color: #003366;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            transition: opacity 0.3s;
-        }
-
-        .loading-indicator.active {
-            display: block;
-            opacity: 1;
-        }
     </style>
 </head>
 
@@ -236,7 +218,7 @@
             </div>
             <nav>
                 <ul>
-                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('home') }}" class="active">Home</a></li>
                     <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
                     <li><a href="{{ url_for('map_page') }}">Map View</a></li>
                     <li><a href="/path">Track Path</a></li>
@@ -254,31 +236,31 @@
             <a href="{{ url_for('map_page') }}"><i class="fas fa-map icon"></i> Map View</a>
             <a href="/path"><i class="fas fa-route icon"></i> Track Path</a>
             <a href="/terminal"><i class="fas fa-history icon"></i> Terminal History</a>
-            <a href="/control"><i class="fas fa-pencil icon"></i> Control Terminals</a>
+            <a href="/control"><i class="fas fa-pencil-alt icon"></i> Control Terminals</a>
         </div>
         <div class="features">
             <div class="feature">
-                <i class="fa fa-location-arrow"></i>
+                <i class="fas fa-location-arrow"></i>
                 <h3>Current Location</h3>
                 <p>View the current locations of all terminals in real-time.</p>
             </div>
             <div class="feature">
-                <i class="fa fa-map"></i>
+                <i class="fas fa-map"></i>
                 <h3>Map View</h3>
                 <p>Visualize terminal locations on an interactive map with filtering options.</p>
             </div>
             <div class="feature">
-                <i class="fa-sharp fa-regular fa-route"></i>
+                <i class="fas fa-route"></i>
                 <h3>Track Path</h3>
                 <p>Track the movement path of terminals over a specified period.</p>
             </div>
             <div class="feature">
-                <i class="fa fa-history"></i>
+                <i class="fas fa-history"></i>
                 <h3>Terminal History</h3>
                 <p>Access historical data and activity logs of individual terminals.</p>
             </div>
             <div class="feature">
-                <i class="fa fa-pencil"></i>
+                <i class="fas fa-pencil-alt"></i>
                 <h3>Control Terminals</h3>
                 <p>Interact with terminals at a district administrative level</p>
         </div>
@@ -290,9 +272,13 @@
             <li><a href="{{ url_for('map_page') }}">Map View</a></li>
             <li><a href="/path">Track Path</a></li>
             <li><a href="/terminal">Terminal History</a></li>
-            <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
+            <li><a href="/control">Control Terminals</a></li>
         </ul>
+        <p>&copy; 2024 Terminal Tracking System. All rights reserved.</p>
     </footer>
+    <div class="loading-indicator">
+        <i class="fas fa-spinner fa-spin"></i> Loading...
+    </div>
 </body>
 
 </html>

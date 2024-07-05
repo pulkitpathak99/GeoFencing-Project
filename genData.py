@@ -1,3 +1,6 @@
+#This is genData.py
+
+
 import csv
 import json
 import os
@@ -5,6 +8,7 @@ import random
 import time
 from datetime import datetime
 from random import uniform
+from pyle38 import Tile38
 
 import pymysql
 from shapely.geometry import shape, Point, Polygon
@@ -129,6 +133,8 @@ class TerminalDataGenerator:
             latitude, longitude = generate_coordinates(coords[0], coords[1])
             district = get_district_from_coordinates(latitude, longitude, self.district_features)
             state = get_state_from_coordinates(latitude, longitude, self.states_shapes)
+            device_id=self.device_id_start+ str(i)
+
 
             data = (
                 timestamp, self.sai_start + i, self.device_id_start + str(i), random.randint(1000, 10000),
@@ -164,7 +170,7 @@ def main():
     db_manager.connect()
 
     try:
-        data_generator = TerminalDataGenerator(db_manager, 'india_taluk.geojson')
+        data_generator = TerminalDataGenerator(db_manager, 'india_districts.geojson')
         while True:
             data = data_generator.generate_data()
             data_generator.insert_data(data)

@@ -9,6 +9,7 @@ import json
 import redis
 import threading
 import logging
+from datetime import datetime
 
 # Initialize Tile38 client
 tile38 = redis.StrictRedis(host='localhost', port=9851, decode_responses=True)
@@ -27,8 +28,9 @@ db.init_app(app)
 
 # Initialize MQTT client
 mqtt_client = mqtt.Client()
-mqtt_client.connect("localhost", 1883, 60)
-mqtt_client.loop_start()
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Connect to MySQL database using pymysql
 def connect_to_mysql():
@@ -40,24 +42,10 @@ def connect_to_mysql():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-def setup_geofences():
-    with open('india_taluk.geojson', 'r') as f:
-        data = json.load(f)
-    for feature in data['features']:
-        district_name = feature['properties']['NAME_2'].replace(' ', '_')
-        state_name = feature['properties']['NAME_1'].replace(' ', '_')
-        polygon = feature['geometry']
-        geojson_string = json.dumps({
-            "type": "Feature",
-            "properties": {},
-            "geometry": polygon
-        })
-        geofence_id = f"{state_name}_{district_name}"
-        tile38.execute_command('SET', 'geofences', geofence_id, 'OBJECT', geojson_string)
+# Global variable to store current geofence
+current_geofence = None
 
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-# Event handlers here
+# Event handlers
 @socketio.on('connect')
 def on_connect():
     emit('message', {'status': 'connected'})
@@ -66,24 +54,81 @@ def on_connect():
 def on_disconnect():
     emit('message', {'status': 'disconnected'})
 
-# Import additional necessary modules
-from datetime import datetime
+@socketio.on('set_geofence')
+def handle_set_geofence(data):
+    state = data['state']
+    district = data['district']
 
-# Geofence event handling
-def handle_geofence_events():
-    pubsub = tile38.pubsub()
-    pubsub.subscribe('geofences')
-    for message in pubsub.listen():
-        if message['type'] == 'message':
-            data = json.loads(message['data'])
-            if data['event'] == 'enter':
-                on_enter_geofence(data)
-            elif data['event'] == 'exit':
-                on_exit_geofence(data)
+    # Get the polygon for the district
+    polygon = get_district_polygon(state, district)
 
-geofence_thread = threading.Thread(target=handle_geofence_events)
-geofence_thread.daemon = True
-geofence_thread.start()
+    # Set the geofence in Tile38
+    tile38.set(f'geofence:{state}:{district}').polygon(polygon).exec()
+
+    # Update terminals in the database based on the new geofence
+    update_terminals_geofence_status(state, district)
+
+@socketio.on('remove_geofence')
+def handle_remove_geofence(data):
+    state = data['state']
+    district = data['district']
+
+    # Remove the geofence from Tile38
+    tile38.del_(f'geofence:{state}:{district}').exec()
+
+    # Update all terminals to be active
+    update_all_terminals_active()
+
+def on_message(client, userdata, message):
+    try:
+        payload = json.loads(message.payload.decode())
+        device_id = payload.get('Device_Id')
+        latitude = payload.get('Latitude')
+        longitude = payload.get('Longitude')
+        
+        # Update terminal location in Tile38
+        tile38.set(f'terminal:{device_id}').point(latitude, longitude).exec()
+        
+        # Check if the terminal is in any geofence
+        geofences = tile38.intersects('geofences').get(f'terminal:{device_id}').execute()
+        
+        is_in_geofence = len(geofences) > 0
+        update_terminal_status(device_id, is_in_geofence)
+        
+        # Emit a geofence update event
+        socketio.emit('geofence_update', {
+            'action': 'enter' if is_in_geofence else 'exit',
+            'terminal': payload
+        })
+    
+    except json.JSONDecodeError:
+        logging.error(f"Invalid JSON: {message.payload.decode()}")
+    except Exception as e:
+        logging.error(f"Error processing message: {e}")
+
+def update_terminals_geofence_status(state, district):
+    # Get all terminals within the geofence
+    terminals = tile38.intersects('terminals').get(f'geofence:{state}:{district}').execute()
+
+    for terminal in terminals:
+        device_id = terminal['id'].split(':')[1]
+        update_terminal_status(device_id, True)
+
+    # Emit geofence update events
+    socketio.emit('bulk_geofence_update', {
+        'action': 'enter',
+        'terminals': [t['id'].split(':')[1] for t in terminals],
+        'state': state,
+        'district': district
+    })
+
+mqtt_client.on_message = on_message
+
+def is_in_geofence(state, district):
+    global current_geofence
+    if current_geofence is None:
+        return False
+    return state == current_geofence['state'] and district == current_geofence['district']
 
 # Route for the home page
 @app.route('/')
@@ -157,6 +202,55 @@ def get_terminal_data():
     connection.close()
     return jsonify(data)
 
+@app.route('/api/get-terminals-by-location')
+def fetch_terminals_by_location():
+    state = request.args.get('state', '')
+    district = request.args.get('district', '')
+    try:
+        connection = connect_to_mysql()
+        cursor = connection.cursor()
+        sql = """
+        SELECT Device_Id, Latitude, Longitude, District, State
+        FROM terminal_data
+        WHERE (%s = '' OR State = %s) AND (%s = '' OR District = %s) AND Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
+        ORDER BY Device_Id
+        """
+        cursor.execute(sql, (state, state, district, district))
+        terminals = cursor.fetchall()
+        return jsonify(terminals)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/terminals-by-location', methods=['GET'])
+def get_terminals_by_location():
+    state = request.args.get('state')
+    district = request.args.get('district')
+    
+    if not state or not district:
+        return jsonify({'error': 'Both state and district are required'}), 400
+
+    try:
+        connection = connect_to_mysql()
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = """
+            SELECT DISTINCT Device_Id, Latitude, Longitude
+            FROM terminal_data
+            WHERE State = %s AND District = %s
+            ORDER BY Device_Id
+            """
+            cursor.execute(sql, (state, district))
+            terminals = cursor.fetchall()
+
+        return jsonify(terminals)
+    except Exception as e:
+        logging.error(f"Error fetching terminals by location: {str(e)}")
+        return jsonify({'error': 'Failed to fetch terminals'}), 500
+    finally:
+        if connection:
+            connection.close()
+
 # API route to fetch path data for a specific terminal
 @app.route('/api/path')
 def get_terminal_path():
@@ -178,9 +272,19 @@ def get_terminal_path():
     return jsonify(path_data)
 
 # Load GeoJSON data for states and districts
-with open('states-and-districts.geojson', 'r') as f:
+with open('india_districts.geojson', 'r') as f:
     data = json.load(f)
-states_and_districts = {state['state']: state['districts'] for state in data['states']}
+
+# Create a dictionary to store states and their districts
+states_and_districts = {}
+for feature in data['features']:
+    state_name = feature['properties']['NAME_1']
+    district_name = feature['properties']['NAME_2']
+    
+    if state_name not in states_and_districts:
+        states_and_districts[state_name] = []
+    
+    states_and_districts[state_name].append(district_name)
 
 # API route to fetch all states
 @app.route('/api/states', methods=['GET'])
@@ -217,89 +321,41 @@ def fetch_terminals():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/terminals-by-location')
-def get_terminals_by_location():
-    state = request.args.get('state', '')
-    district = request.args.get('district', '')
-    try:
-        connection = connect_to_mysql()
-        cursor = connection.cursor()
-        sql = """
-        SELECT Device_Id, Latitude, Longitude, District, State
-        FROM terminal_data
-        WHERE (%s = '' OR State = %s) AND (%s = '' OR District = %s) AND Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
-        ORDER BY Device_Id
-        """
-        cursor.execute(sql, (state, state, district, district))
-        terminals = cursor.fetchall()
-        return jsonify(terminals)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        connection.close()
-
-# New route to render the control page
 @app.route('/control')
-def control_page():
+def control():
     return render_template('control.html')
 
-@app.route('/select_district', methods=['POST'])
-def select_district():
-    data = request.get_json()
-    state = data.get('state')
-    district = data.get('district')
-    connection = connect_to_mysql()
-    cursor = connection.cursor()
-    sql = """
-    SELECT Device_Id, Latitude, Longitude, District, State
-    FROM terminal_data
-    WHERE State = %s AND District = %s AND Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
-    ORDER BY Device_Id
-    """
-    cursor.execute(sql, (state, district))
-    terminals = cursor.fetchall()
-    connection.close()
-    return jsonify(terminals)
+# Function to get polygon for a given state and district
+def get_district_polygon(state, district):
+    for feature in data['features']:
+        if feature['properties']['NAME_1'] == state and feature['properties']['NAME_2'] == district:
+            return feature['geometry']['coordinates']
+    return None
 
-# Modify the event handlers to control terminal transmission
-def on_enter_geofence(data):
-    state, district = data['state'], data['district']
-    terminal_id = data['terminal_id']
-    
+# Update terminal status in the database
+def update_terminal_status(device_id, status):
     try:
-        # Update the terminal's status in the database to 'transmission_disallowed'
         connection = connect_to_mysql()
         cursor = connection.cursor()
-        sql = "UPDATE terminals SET status = 'transmission_disallowed' WHERE id = %s"
-        cursor.execute(sql, (terminal_id,))
+        sql = "UPDATE terminals SET status = %s WHERE device_id = %s"
+        cursor.execute(sql, ('inactive' if status else 'active', device_id))
         connection.commit()
-        
-        # Emit an event to the frontend to notify the user
-        socketio.emit('geofence_event', {'event': 'enter', 'terminal_id': terminal_id, 'state': state, 'district': district})
-    except Exception as e:
-        logging.error(f"Error updating terminal status: {e}")
-    finally:
         connection.close()
+    except Exception as e:
+        print(f"Error updating terminal status: {e}")
 
-def on_exit_geofence(data):
-    state, district = data['state'], data['district']
-    terminal_id = data['terminal_id']
-    
+# Update all terminals to be active
+def update_all_terminals_active():
     try:
-        # Update the terminal's status in the database to 'transmission_allowed'
         connection = connect_to_mysql()
         cursor = connection.cursor()
-        sql = "UPDATE terminals SET status = 'transmission_allowed' WHERE id = %s"
-        cursor.execute(sql, (terminal_id,))
+        sql = "UPDATE terminals SET status = 'active'"
+        cursor.execute(sql)
         connection.commit()
-        
-        # Emit an event to the frontend to notify the user
-        socketio.emit('geofence_event', {'event': 'exit', 'terminal_id': terminal_id, 'state': state, 'district': district})
-    except Exception as e:
-        logging.error(f"Error updating terminal status: {e}")
-    finally:
         connection.close()
+    except Exception as e:
+        print(f"Error updating terminals: {e}")
 
+# Start Flask application
 if __name__ == '__main__':
-    setup_geofences()
     socketio.run(app, debug=True)

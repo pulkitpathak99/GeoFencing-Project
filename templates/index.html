@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -171,7 +173,7 @@
                     <li><a id="mapLink" href="{{ url_for('map_page') }}">Map View</a></li>
                     <li><a href="/path">Track Path</a></li>
                     <li><a href="/terminal">Terminal History</a></li>
-                    <li><a href="{{ url_for('control_page') }}">Control Terminals</a></li>
+                    <li><a href="control">Control Terminals</a></li>
                 </ul>
             </nav>
         </div>
@@ -235,6 +237,34 @@
             const historyTableBody = document.querySelector('tbody');
             const exportButton = document.getElementById('exportButton');
 
+            var socket = io();
+
+socket.on('connect', function() {
+    console.log('Connected to server');
+});
+
+socket.on('disconnect', function() {
+    console.log('Disconnected from server');
+});
+
+socket.on('geofence_update', function(data) {
+    var action = data.action;
+    var terminal = data.terminal;
+    console.log('Geofence update:', action, terminal);
+    updateTableRow(terminal);
+});
+
+function updateTableRow(terminal) {
+    $('#data-table tbody tr').each(function() {
+        var row = $(this);
+        if (row.find('td:nth-child(3)').text() === terminal.Device_Id) {
+            row.find('td:nth-child(8)').text(terminal.Status);
+        }
+    });
+}
+            
+            
+
             // Function to download CSV file
             function downloadCSV(csv, filename) {
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -268,5 +298,4 @@
         });
     </script>
 </body>
-
 </html>
