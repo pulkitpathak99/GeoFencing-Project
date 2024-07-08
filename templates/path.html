@@ -1,290 +1,278 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Terminal Path Viewer</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f6f8;
-      color: #333;
-    }
-
-    header {
-      background-color: #003366;
-      color: white;
-      padding: 20px 0;
-    }
-
-    header .container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 20px;
-    }
-
-    header .logo img {
-      height: 60px;
-    }
-
-    header nav ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-    }
-
-    header nav ul li {
-      margin-left: 20px;
-    }
-
-    header nav ul li a {
-      color: white;
-      text-decoration: none;
-      font-size: 18px;
-    }
-
-    header nav ul li a:hover {
-      text-decoration: underline;
-    }
-
-    main {
-      max-width: 1200px;
-      margin: 20px auto;
-      padding: 20px;
-      background-color: white;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      border-radius: 8px;
-    }
-
-    h1 {
-      color: #003366;
-      text-align: center;
-      padding-bottom: 20px;
-    }
-
-    form {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      padding-bottom: 20px;
-    }
-
-    form label {
-      flex: 1 0 100px;
-    }
-
-    form select, form button {
-      flex: 1 0 calc(33% - 10px);
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 16px;
-    }
-
-    form input[type="checkbox"] {
-      margin-right: 5px;
-    }
-
-    form button {
-      background-color: #003366;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-
-    form button:hover {
-      background-color: #002244;
-    }
-
-    #map {
-      height: 600px;
-      margin-top: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    #loading-indicator {
-      display: none;
-      text-align: center;
-      padding: 10px;
-      background-color: rgba(0, 0, 0, 0.7);
-      color: white;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 5px;
-      z-index: 9999;
-      font-size: 18px;
-    }
-
-    @media (max-width: 768px) {
-      header .container {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      form {
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      footer ul {
-        flex-direction: column;
-        gap: 10px;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Path Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: #333;
+        }
+        header {
+            background-color: #003366;
+            color: white;
+            padding: 20px 0;
+        }
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        header .logo img {
+            height: 60px;
+        }
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
+        header nav ul li {
+            margin-left: 20px;
+        }
+        header nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+            transition: color 0.3s ease;
+        }
+        header nav ul li a:hover {
+            color: #64b5f6;
+        }
+        main {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        h1 {
+            color: #003366;
+            text-align: center;
+            padding-bottom: 20px;
+        }
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+        form label {
+            flex: 1 0 100px;
+            font-weight: bold;
+        }
+        form select, form button {
+            flex: 1 0 calc(33% - 15px);
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: #fff;
+        }
+        form button {
+            background-color: #003366;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        form button:hover {
+            background-color: #002244;
+        }
+        #map {
+            height: 600px;
+            margin-top: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        #loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 5px;
+            z-index: 9999;
+            font-size: 18px;
+        }
+        .leaflet-popup-content {
+            font-size: 14px;
+        }
+        .leaflet-popup-content p {
+            margin: 5px 0;
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <div class="logo">
-        <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
-      </div>
-      <nav>
-        <ul>
-          <li><a href="{{ url_for('home') }}">Home</a></li>
-          <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
-          <li><a href="{{ url_for('map_page') }}">Map View</a></li>
-          <li><a href="/path">Track Path</a></li>
-          <li><a href="/terminal">Terminal History</a></li>
-          <li><a href="/control">Control Terminals</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                    <li><a href="/control">Control Terminals</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
 
-  <main>
-    <h1>Terminal Path Viewer</h1>
-    <form id="terminal-form">
-      <label for="terminal">Select Terminal:</label>
-      <select id="terminal" name="terminal">
-        <option value="" selected disabled>Select terminal</option>
-      </select>
+    <main>
+        <h1>Terminal Path Viewer</h1>
+        <form id="terminal-form">
+            <label for="terminal">Select Terminal:</label>
+            <select id="terminal" name="terminal" required>
+                <option value="" selected disabled>Select terminal</option>
+            </select>
 
-      <label for="timeframe">Select Timeframe:</label>
-      <select id="timeframe" name="timeframe">
-        <option value="1"> Last Hour</option>
-        <option value="24">Last 24 hours</option>
-        <option value="48">Last 48 hours</option>
-        <option value="168">Last Week</option>
-        <option value="720">Last Month</option>
-      </select>
+            <label for="timeframe">Select Timeframe:</label>
+            <select id="timeframe" name="timeframe" required>
+                <option value="1">Last Hour</option>
+                <option value="6">Last 6 Hours</option>
+                <option value="12">Last 12 Hours</option>
+                <option value="24">Last 24 Hours</option>
+                <option value="48">Last 48 Hours</option>
+                <option value="168">Last Week</option>
+            </select>
 
-      <label for="show-path-markers">
-        <input type="checkbox" id="show-path-markers"> Show Path Markers
-      </label>
+            <button type="submit">Show Path</button>
+        </form>
 
-      <button type="submit">Show Path</button>
-    </form>
+        <div id="map"></div>
 
-    <div id="map"></div>
+        <div id="loading-indicator">Loading...</div>
+    </main>
 
-    <div id="loading-indicator">Loading...</div>
-  </main>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const map = L.map('map').setView([20.5937, 78.9629], 5);
+            L.tileLayer('https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
+                attribution: '&copy; <a href="https://www.maptiler.com/copyright">MapTiler</a> contributors'
+            }).addTo(map);
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      // Define custom icons
-      L.icon.startMarker = L.icon({
-        iconUrl: './static/images/start-icon.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-      L.icon.endMarker = L.icon({
-        iconUrl: './static/images/end-icon.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-  
-      const map = L.map('map').setView([20.5937, 78.9629], 5);
-      L.tileLayer('https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
-        attribution: '&copy; <a href="https://www.maptiler.com/copyright">MapTiler</a> contributors'
-      }).addTo(map);
-  
-      const loadingIndicator = document.getElementById('loading-indicator');
-      const terminalSelect = document.getElementById('terminal');
-      const showPathMarkersCheckbox = document.getElementById('show-path-markers');
-      
-      fetch('/api/terminals')
-        .then(response => response.json())
-        .then(data => {
-          const uniqueTerminals = new Set();
-          data.forEach(terminal => {
-            if (!uniqueTerminals.has(terminal.id)) {
-              uniqueTerminals.add(terminal.id);
-              const option = document.createElement('option');
-              option.value = terminal.id;
-              option.textContent = terminal.name;
-              terminalSelect.appendChild(option);
-            }
-          });
-        })
-        .catch(error => {
-          console.error('Error fetching terminals:', error);
-          alert('Failed to load terminals.');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const terminalSelect = document.getElementById('terminal');
+            const markers = L.markerClusterGroup();
+
+            const startIcon = L.icon({
+                iconUrl: '/static/images/start-icon.png',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            });
+            
+            const endIcon = L.icon({
+                iconUrl: '/static/images/end-icon.png',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            });
+            
+            const wayPointIcon = L.icon({
+                iconUrl: '/static/images/waypoint-icon.png',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+                popupAnchor: [0, -8]
+            });
+
+            fetch('/api/terminals')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(terminal => {
+                        const option = document.createElement('option');
+                        option.value = terminal.id;
+                        option.textContent = terminal.name;
+                        terminalSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching terminals:', error);
+                    alert('Failed to load terminals.');
+                });
+
+            document.getElementById('terminal-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                const terminalId = terminalSelect.value;
+                const timeframe = document.getElementById('timeframe').value;
+                if (!terminalId || !timeframe) {
+                    alert('Please select a terminal and a timeframe.');
+                    return;
+                }
+
+                loadingIndicator.style.display = 'block';
+                fetch(`/api/path?terminal=${terminalId}&timeframe=${timeframe}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        loadingIndicator.style.display = 'none';
+                        markers.clearLayers();
+
+                        if (!data || data.length === 0) {
+                            alert('No path data available for the selected terminal and timeframe.');
+                            return;
+                        }
+
+                        const coordinates = data.map(point => [point.latitude, point.longitude]);
+                        const startPoint = coordinates[0];
+                        const endPoint = coordinates[coordinates.length - 1];
+
+                        L.marker(startPoint, { icon: startIcon })
+                            .addTo(map)
+                            .bindPopup(`<b>Start</b><br>${data[0].timestamp}`);
+                        
+                        L.marker(endPoint, { icon: endIcon })
+                            .addTo(map)
+                            .bindPopup(`<b>End</b><br>${data[data.length-1].timestamp}`);
+
+                        data.forEach((point, index) => {
+                            if (index !== 0 && index !== data.length - 1) {
+                                const marker = L.marker([point.latitude, point.longitude], { icon: wayPointIcon })
+                                    .bindPopup(`<b>Waypoint</b><br>${point.timestamp}`);
+                                markers.addLayer(marker);
+                            }
+                        });
+
+                        map.addLayer(markers);
+
+                        const pathLine = L.polyline(coordinates, { 
+                            color: 'blue',
+                            weight: 3,
+                            opacity: 0.7,
+                            dashArray: '10, 10',
+                            lineCap: 'round'
+                        }).addTo(map);
+
+                        map.fitBounds(pathLine.getBounds());
+                    })
+                    .catch(error => {
+                        loadingIndicator.style.display = 'none';
+                        console.error('Error fetching path data:', error);
+                        alert('Failed to load path data.');
+                    });
+            });
         });
-  
-      document.getElementById('terminal-form').addEventListener('submit', function(event) {
-        event.preventDefault();
-        const terminalId = terminalSelect.value;
-        const timeframe = document.getElementById('timeframe').value;
-        if (!terminalId || !timeframe) {
-          alert('Please select a terminal and a timeframe.');
-          return;
-        }
-  
-        loadingIndicator.style.display = 'block';
-        fetch('/api/path?terminal=' + terminalId + '&timeframe=' + timeframe)
-          .then(response => response.json())
-          .then(data => {
-            loadingIndicator.style.display = 'none';
-            const path = data.map(point => [point.latitude, point.longitude]);
-  
-            // Extract start and end points from the path
-            const startPoint = path[0];
-            const endPoint = path[path.length - 1];
-  
-            if (showPathMarkersCheckbox.checked) {
-              const markers = L.markerClusterGroup();
-              markers.addLayer(L.marker(startPoint, { icon: L.icon.startMarker }));
-              path.forEach(point => {
-                markers.addLayer(L.marker(point));
-              });
-              markers.addLayer(L.marker(endPoint, { icon: L.icon.endMarker }));
-              map.addLayer(markers);
-            } else {
-              const polyline = L.polyline(path, { color: 'blue', dashArray: '5, 10' }).addTo(map);
-              map.fitBounds(polyline.getBounds());
-            }
-  
-            // Add popups to start and end markers
-            L.marker(startPoint, { icon: L.icon.startMarker }).addTo(map).bindPopup("<b>Start Point</b>");
-            L.marker(endPoint, { icon: L.icon.endMarker }).addTo(map).bindPopup("<b>End Point</b>");
-          })
-          .catch(error => {
-            loadingIndicator.style.display = 'none';
-            console.error('Error fetching path:', error);
-            alert('Failed to load path.');
-          });
-      });
-    });
-  </script>
-  
+    </script>
 </body>
 </html>

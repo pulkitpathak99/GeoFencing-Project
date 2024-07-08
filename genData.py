@@ -1,23 +1,25 @@
-#This is genData.py
-
-
 import csv
 import json
 import os
 import random
+from psycopg2.extras import execute_values
+import psycopg2
 import time
+
 from datetime import datetime
 from random import uniform
-from pyle38 import Tile38
-
-import pymysql
 from shapely.geometry import shape, Point, Polygon
+
+#
+
+
 
 # Database Configuration
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
-    'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', ''),
+    'port': 5432,
+    'user': os.getenv('DB_USER', 'postgres'),  # Replace with your PostgreSQL username
+    'password': os.getenv('DB_PASSWORD', 'postgres'),  # Replace with your PostgreSQL password
     'database': os.getenv('DB_NAME', 'terminal_data_db')
 }
 
@@ -88,7 +90,8 @@ class DatabaseManager:
         self.connection = None
 
     def connect(self):
-        self.connection = pymysql.connect(**self.config)
+        self.connection = psycopg2.connect(**self.config)
+        self.create_table_if_not_exists()  # Ensure table exists on connection
 
     def close(self):
         if self.connection:
@@ -96,9 +99,54 @@ class DatabaseManager:
 
     def execute(self, query, data):
         with self.connection.cursor() as cursor:
-            cursor.execute(query, data)
+            execute_values(cursor, query, data)
 
     def commit(self):
+        self.connection.commit()
+
+    def create_table_if_not_exists(self):
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS terminal_data (
+            id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP,
+            sai INT,
+            device_id TEXT,
+            sbc_id INT,
+            sequence_num INT,
+            mlr_option_flag TEXT,
+            latitude FLOAT,
+            longitude FLOAT,
+            district TEXT,
+            state TEXT,
+            velocity FLOAT,
+            track_angle FLOAT,
+            azimuth FLOAT,
+            elevation FLOAT,
+            rx_esno FLOAT,
+            tx_esno FLOAT,
+            rate_string TEXT,
+            modem_output_power FLOAT,
+            cal_ant_eirp FLOAT,
+            mlr_sat_beam_id TEXT,
+            mbs_option_flag TEXT,
+            mbs_sat_beam_id TEXT,
+            error_index INT,
+            vsat_mgmt_addr TEXT,
+            num_msg_processed INT,
+            status VARCHAR(20) DEFAULT ACTIVE
+        );
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(create_table_sql)
+
+        create_table_sql="""
+        CREATE TABLE IF NOT EXISTS terminals (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL
+        );
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(create_table_sql)
         self.connection.commit()
 
 # Terminal Data Generator
@@ -135,9 +183,8 @@ class TerminalDataGenerator:
             state = get_state_from_coordinates(latitude, longitude, self.states_shapes)
             device_id=self.device_id_start+ str(i)
 
-
             data = (
-                timestamp, self.sai_start + i, self.device_id_start + str(i), random.randint(1000, 10000),
+                timestamp, self.sai_start + i, device_id, random.randint(1000, 10000),
                 random.randint(1, 1000), 'Yes' if random.random() > 0.5 else 'No', latitude, longitude,
                 district, state, round(uniform(0, 120), 2), round(uniform(0, 360), 2), round(uniform(0, 360), 2),
                 round(uniform(0, 90), 2), round(uniform(0, 20), 2), round(uniform(0, 20), 2),
@@ -153,15 +200,18 @@ class TerminalDataGenerator:
     def insert_data(self, data):
         insert_sql = """
         INSERT INTO terminal_data (
-            Timestamp, SAI, Device_Id, SBC_Id, Sequence_Num, MLR_Option_Flag,
-            Latitude, Longitude, District, State, Velocity, Track_Angle,
-            Azimuth, Elevation, Rx_Esno, Tx_Esno, RateString, Modem_Output_Power,
-            Cal_Ant_EIRP, MLR_Sat_Beam_Id, MBS_Option_Flag, MBS_Sat_Beam_Id,
-            Error_Index, VSAT_MGMT_Addr, Num_Msg_Processed
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            timestamp, sai, device_id, sbc_id, sequence_num, mlr_option_flag,
+            latitude, longitude, district, state, velocity, track_angle,
+            azimuth, elevation, rx_esno, tx_esno, rate_string, modem_output_power,
+            cal_ant_eirp, mlr_sat_beam_id, mbs_option_flag, mbs_sat_beam_id,
+            error_index, vsat_mgmt_addr, num_msg_processed
+        ) VALUES %s
         """
-        for row in data:
-            self.db_manager.execute(insert_sql, row)
+        self.db_manager.execute(insert_sql, data)
+        insert_sql = '''
+        INSERT INTO terminal (SELECT DISTINCT device_id FROM terminal_data);
+        '''
+        self.db_manager.execute(insert_sql)
         self.db_manager.commit()
 
 # Main execution
@@ -174,7 +224,6 @@ def main():
         while True:
             data = data_generator.generate_data()
             data_generator.insert_data(data)
-            write_to_csv(data)
             print("Data generated and inserted at", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             time.sleep(10)
     finally:

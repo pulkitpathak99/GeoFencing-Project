@@ -213,7 +213,7 @@
                     <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
                     <li><a href="{{ url_for('map_page') }}">Map View</a></li>
                     <li><a href="/path">Track Path</a></li>
-                    <li><a href="/terminal">Terminal History</a></li>
+                    <li><a class="active" href="/terminal">Terminal History</a></li>
                     <li><a href="/control">Control Terminals</a></li>
                 </ul>
             </nav>
@@ -252,6 +252,11 @@
             </thead>
             <tbody></tbody>
         </table>
+        <div id="pagination">
+            <button id="prevPage" disabled>Previous</button>
+            <span id="pageInfo"></span>
+            <button id="nextPage">Next</button>
+        </div>
     </main>
     <footer>
         <ul>
@@ -262,70 +267,119 @@
             <li><a href="/terminal">Terminal History</a></li>
         </ul>
     </footer>
-
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const terminalSelect = document.getElementById('terminalSelect');
             const historyTableBody = document.getElementById('historyTable').querySelector('tbody');
             const loadingIndicator = document.getElementById('loadingIndicator');
             const exportButton = document.getElementById('exportCSV');
-
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const pageInfo = document.getElementById('pageInfo');
+        
+            let currentPage = 1;
+            let totalPages = 1;
+            let currentTerminal = '';
+            let currentTimeframe = '';
+        
+            // Fetch terminals and populate the dropdown
             fetch('/api/terminals')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(terminals => {
+                    if (terminals.length === 0) {
+                        throw new Error('No terminals received from the server');
+                    }
                     terminals.forEach(terminal => {
                         const option = document.createElement('option');
                         option.value = terminal.id;
                         option.textContent = terminal.name;
                         terminalSelect.appendChild(option);
                     });
+                })
+                .catch(error => {
+                    console.error('Error fetching terminals:', error);
+                    alert('Failed to load terminals. Please try refreshing the page.');
                 });
+        
+                function fetchTerminalData(page = 1) {
+    loadingIndicator.classList.add('active');
+    console.log(`Fetching data for terminal: ${currentTerminal}, timeframe: ${currentTimeframe}, page: ${page}`);
+    fetch(`/api/terminal-data?terminal=${currentTerminal}&timeframe=${currentTimeframe}&page=${page}`)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw err; });
+            }
+            return response.json();
+        })
+        .then(response => {
+            console.log('Received response:', response);
+            loadingIndicator.classList.remove('active');
+            if (!response.data || response.data.length === 0) {
+                historyTableBody.innerHTML = '<tr><td colspan="5">No data available for the selected timeframe</td></tr>';
+                return;
+            }
+            historyTableBody.innerHTML = '';
+            response.data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.timestamp}</td>
+                    <td>${row.latitude}</td>
+                    <td>${row.longitude}</td>
+                    <td>${row.district}</td>
+                    <td>${row.state}</td>
+                `;
+                historyTableBody.appendChild(tr);
+            });
 
+            currentPage = response.current_page;
+            totalPages = response.total_pages;
+            updatePaginationControls();
+        })
+        .catch(error => {
+            loadingIndicator.classList.remove('active');
+            console.error('Error fetching terminal data:', error);
+            historyTableBody.innerHTML = `<tr><td colspan="5">Error: ${error.message || 'Unknown error occurred'}</td></tr>`;
+        });
+}
+        
+            function updatePaginationControls() {
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = currentPage === totalPages;
+                pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            }
+        
             document.getElementById('terminalForm').addEventListener('submit', function(event) {
                 event.preventDefault();
-                const terminal = terminalSelect.value;
-                const timeframe = document.getElementById('timeframeSelect').value;
-                if (!terminal || !timeframe) {
+                currentTerminal = terminalSelect.value;
+                currentTimeframe = document.getElementById('timeframeSelect').value;
+                if (!currentTerminal || !currentTimeframe) {
                     alert('Please select a terminal and a timeframe.');
                     return;
                 }
-
-                loadingIndicator.classList.add('active');
-                fetch('/api/terminal-data?terminal=' + terminal + '&timeframe=' + timeframe)
-                    .then(response => response.json())
-                    .then(data => {
-                        loadingIndicator.classList.remove('active');
-                        historyTableBody.innerHTML = '';
-                        data.forEach(row => {
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td>${row.Timestamp}</td>
-                                <td>${row.Latitude}</td>
-                                <td>${row.Longitude}</td>
-                                <td>${row.District}</td>
-                                <td>${row.State}</td>
-                            `;
-                            historyTableBody.appendChild(tr);
-                        });
-                    })
-                    .catch(error => {
-                        loadingIndicator.classList.remove('active');
-                        alert('Failed to load terminal data.');
-                        console.error('Error fetching terminal data:', error);
-                    });
+                console.log(`Form submitted. Terminal: ${currentTerminal}, Timeframe: ${currentTimeframe}`);
+                currentPage = 1;
+                fetchTerminalData(currentPage);
             });
-
-            // Function to download CSV file
-            function downloadCSV(csv, filename) {
-                const csvFile = new Blob([csv], { type: 'text/csv' });
-                const downloadLink = document.createElement('a');
-                downloadLink.download = filename;
-                downloadLink.href = window.URL.createObjectURL(csvFile);
-                downloadLink.style.display = 'none';
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-            }
+        
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchTerminalData(currentPage);
+                }
+            });
+        
+            nextPageBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    fetchTerminalData(currentPage);
+                }
+            });
 
             // Export table data to CSV
             exportButton.addEventListener('click', function() {

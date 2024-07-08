@@ -1,227 +1,186 @@
 from flask import Flask, render_template, jsonify, request
-import pymysql
 from flask_cors import CORS
-import paho.mqtt.client as mqtt
+from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
-from models import db, TerminalData, District, Terminal
 import os
 import json
-import redis
-import threading
 import logging
-from datetime import datetime
-
-# Initialize Tile38 client
-tile38 = redis.StrictRedis(host='localhost', port=9851, decode_responses=True)
-
-# Install pymysql as MySQLdb
-pymysql.install_as_MySQLdb()
+from datetime import datetime, timedelta
+from sqlalchemy import desc
 
 # Initialize Flask application
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-
-# Configure database URI and settings
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'mysql://root:@localhost/terminal_data_db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'postgresql://postgres:postgres@localhost:5432/terminal_data_db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-
-# Initialize MQTT client
-mqtt_client = mqtt.Client()
-
-# Initialize SocketIO
+db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Connect to MySQL database using pymysql
-def connect_to_mysql():
-    return pymysql.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        user=os.getenv('DB_USER', 'root'),
-        password=os.getenv('DB_PASSWORD', ''),
-        database=os.getenv('DB_NAME', 'terminal_data_db'),
-        cursorclass=pymysql.cursors.DictCursor
-    )
+# Define models
+class TerminalData(db.Model):
+    __tablename__ = 'terminal_data'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    sai = db.Column(db.String(50))
+    device_id = db.Column(db.String(50))
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    district = db.Column(db.String(100))
+    state = db.Column(db.String(100))
 
-# Global variable to store current geofence
-current_geofence = None
+class Terminal(db.Model):
+    __tablename__ = 'terminals'
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(50), unique=True)
 
-# Event handlers
+# SocketIO event handlers
 @socketio.on('connect')
-def on_connect():
-    emit('message', {'status': 'connected'})
+def handle_connect():
+    print('Client connected')
 
 @socketio.on('disconnect')
-def on_disconnect():
-    emit('message', {'status': 'disconnected'})
+def handle_disconnect():
+    print('Client disconnected')
 
-@socketio.on('set_geofence')
-def handle_set_geofence(data):
-    state = data['state']
-    district = data['district']
+def emit_terminal_update(terminal_data):
+    socketio.emit('terminal_update', terminal_data)
 
-    # Get the polygon for the district
-    polygon = get_district_polygon(state, district)
+# Load GeoJSON data for states and districts
+with open('india_districts.geojson', 'r') as f:
+    data = json.load(f)
+states_and_districts = {}
+for feature in data['features']:
+    state_name = feature['properties']['NAME_1']
+    district_name = feature['properties']['NAME_2']
+    states_and_districts.setdefault(state_name, []).append(district_name)
 
-    # Set the geofence in Tile38
-    tile38.set(f'geofence:{state}:{district}').polygon(polygon).exec()
-
-    # Update terminals in the database based on the new geofence
-    update_terminals_geofence_status(state, district)
-
-@socketio.on('remove_geofence')
-def handle_remove_geofence(data):
-    state = data['state']
-    district = data['district']
-
-    # Remove the geofence from Tile38
-    tile38.del_(f'geofence:{state}:{district}').exec()
-
-    # Update all terminals to be active
-    update_all_terminals_active()
-
-def on_message(client, userdata, message):
-    try:
-        payload = json.loads(message.payload.decode())
-        device_id = payload.get('Device_Id')
-        latitude = payload.get('Latitude')
-        longitude = payload.get('Longitude')
-        
-        # Update terminal location in Tile38
-        tile38.set(f'terminal:{device_id}').point(latitude, longitude).exec()
-        
-        # Check if the terminal is in any geofence
-        geofences = tile38.intersects('geofences').get(f'terminal:{device_id}').execute()
-        
-        is_in_geofence = len(geofences) > 0
-        update_terminal_status(device_id, is_in_geofence)
-        
-        # Emit a geofence update event
-        socketio.emit('geofence_update', {
-            'action': 'enter' if is_in_geofence else 'exit',
-            'terminal': payload
-        })
-    
-    except json.JSONDecodeError:
-        logging.error(f"Invalid JSON: {message.payload.decode()}")
-    except Exception as e:
-        logging.error(f"Error processing message: {e}")
-
-def update_terminals_geofence_status(state, district):
-    # Get all terminals within the geofence
-    terminals = tile38.intersects('terminals').get(f'geofence:{state}:{district}').execute()
-
-    for terminal in terminals:
-        device_id = terminal['id'].split(':')[1]
-        update_terminal_status(device_id, True)
-
-    # Emit geofence update events
-    socketio.emit('bulk_geofence_update', {
-        'action': 'enter',
-        'terminals': [t['id'].split(':')[1] for t in terminals],
-        'state': state,
-        'district': district
-    })
-
-mqtt_client.on_message = on_message
-
-def is_in_geofence(state, district):
-    global current_geofence
-    if current_geofence is None:
-        return False
-    return state == current_geofence['state'] and district == current_geofence['district']
-
-# Route for the home page
+# Routes
 @app.route('/')
 def home():
     return render_template('home.html')
 
-# Route to get the latest data
 @app.route('/latest-data')
 def get_latest_data():
-    connection = connect_to_mysql()
-    cursor = connection.cursor()
-    sql = """
-    SELECT Timestamp, SAI, Device_Id, Latitude, Longitude, District, State, Status
-    FROM terminal_data 
-    WHERE Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
-    ORDER BY SAI
-    """
-    cursor.execute(sql)
-    result = cursor.fetchall()
-    connection.close()
-    return render_template('index.html', data=result)
+    return render_template('index.html')
 
-# API route to fetch the latest data
+@app.route('/api/latest-terminal-data')
+def get_latest_terminal_data():
+    subquery = db.session.query(
+        TerminalData.device_id,
+        db.func.max(TerminalData.timestamp).label('max_timestamp')
+    ).group_by(TerminalData.device_id).subquery()
+
+    latest_data = db.session.query(TerminalData).join(
+        subquery,
+        db.and_(
+            TerminalData.device_id == subquery.c.device_id,
+            TerminalData.timestamp == subquery.c.max_timestamp
+        )
+    ).all()
+
+    result = [{
+        'timestamp': data.timestamp,
+        'sai': data.sai,
+        'device_id': data.device_id,
+        'latitude': data.latitude,
+        'longitude': data.longitude,
+        'district': data.district,
+        'state': data.state,
+    } for data in latest_data]
+
+    return jsonify(result)
+
 @app.route('/api/data')
 def api_data():
-    connection = connect_to_mysql()
-    cursor = connection.cursor()
-    sql = """
-    SELECT Timestamp, SAI, Device_Id, Latitude, Longitude, District, State
-    FROM terminal_data 
-    WHERE Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
-    ORDER BY SAI
-    """
-    cursor.execute(sql)
-    data = cursor.fetchall()
-    connection.close()
-    return jsonify(data)
+    latest_data = TerminalData.query.order_by(TerminalData.timestamp.desc()).limit(1).first()
+    if latest_data:
+        data = {key: getattr(latest_data, key) for key in latest_data.__table__.columns.keys()}
+        return jsonify([data])
+    return jsonify([])
 
-# Route to render the map page
 @app.route('/map')
 def map_page():
     return render_template('map.html')
 
-# Route to render the path page
 @app.route('/path')
 def path_page():
     return render_template('path.html')
 
-# Route to render the terminal page
 @app.route('/terminal')
 def terminal_page():
     return render_template('terminal.html')
 
-# API route to fetch data for a specific terminal
+import pytz
+
 @app.route('/api/terminal-data')
 def get_terminal_data():
     terminal_id = request.args.get('terminal')
     timeframe = request.args.get('timeframe', type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+
+    logging.debug(f"Received request for terminal_id: {terminal_id}, timeframe: {timeframe}, page: {page}")
+
     if not terminal_id or not timeframe:
-        return jsonify([])
-    connection = connect_to_mysql()
-    cursor = connection.cursor()
-    sql = """
-    SELECT Timestamp, Latitude, Longitude, District, State
-    FROM terminal_data
-    WHERE Device_Id = %s AND Timestamp >= NOW() - INTERVAL %s HOUR
-    ORDER BY Timestamp
-    """
-    cursor.execute(sql, (terminal_id, timeframe))
-    data = cursor.fetchall()
-    connection.close()
-    return jsonify(data)
+        logging.warning("Missing terminal_id or timeframe")
+        return jsonify({'error': 'Missing terminal_id or timeframe'}), 400
+    
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(hours=timeframe)
+
+    logging.debug(f"Querying data from {start_time} to {end_time}")
+
+    try:
+        query = TerminalData.query.filter(
+            TerminalData.device_id == terminal_id,
+            TerminalData.timestamp >= start_time
+        ).order_by(desc(TerminalData.timestamp))
+
+        # Log the SQL query
+        logging.debug(f"SQL Query: {query}")
+
+        # Get total count
+        total_count = query.count()
+        logging.debug(f"Total matching records: {total_count}")
+
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        result = [{
+            'timestamp': d.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'latitude': d.latitude,
+            'longitude': d.longitude,
+            'district': d.district,
+            'state': d.state
+        } for d in pagination.items]
+
+        logging.debug(f"Returning {len(result)} items, total pages: {pagination.pages}")
+
+        return jsonify({
+            'data': result,
+            'total_pages': pagination.pages,
+            'current_page': page,
+            'total_items': total_count
+        })
+    except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/get-terminals-by-location')
 def fetch_terminals_by_location():
     state = request.args.get('state', '')
     district = request.args.get('district', '')
     try:
-        connection = connect_to_mysql()
-        cursor = connection.cursor()
-        sql = """
-        SELECT Device_Id, Latitude, Longitude, District, State
-        FROM terminal_data
-        WHERE (%s = '' OR State = %s) AND (%s = '' OR District = %s) AND Timestamp = (SELECT MAX(Timestamp) FROM terminal_data)
-        ORDER BY Device_Id
-        """
-        cursor.execute(sql, (state, state, district, district))
-        terminals = cursor.fetchall()
-        return jsonify(terminals)
+        query = TerminalData.query
+        if state:
+            query = query.filter_by(state=state)
+        if district:
+            query = query.filter_by(district=district)
+        terminals = query.order_by(TerminalData.device_id).all()
+        result = [{key: getattr(t, key) for key in t.__table__.columns.keys()} for t in terminals]
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        connection.close()
 
 @app.route('/api/terminals-by-location', methods=['GET'])
 def get_terminals_by_location():
@@ -232,67 +191,42 @@ def get_terminals_by_location():
         return jsonify({'error': 'Both state and district are required'}), 400
 
     try:
-        connection = connect_to_mysql()
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            sql = """
-            SELECT DISTINCT Device_Id, Latitude, Longitude
-            FROM terminal_data
-            WHERE State = %s AND District = %s
-            ORDER BY Device_Id
-            """
-            cursor.execute(sql, (state, district))
-            terminals = cursor.fetchall()
-
-        return jsonify(terminals)
+        terminals = TerminalData.query.filter_by(state=state, district=district).order_by(TerminalData.device_id).all()
+        result = [{'device_id': terminal.device_id, 'latitude': terminal.latitude, 'longitude': terminal.longitude} for terminal in terminals]
+        return jsonify(result)
     except Exception as e:
         logging.error(f"Error fetching terminals by location: {str(e)}")
         return jsonify({'error': 'Failed to fetch terminals'}), 500
-    finally:
-        if connection:
-            connection.close()
 
-# API route to fetch path data for a specific terminal
 @app.route('/api/path')
 def get_terminal_path():
     terminal_id = request.args.get('terminal')
     timeframe = request.args.get('timeframe', type=int)
     if not terminal_id or not timeframe:
         return jsonify([])
-    connection = connect_to_mysql()
-    cursor = connection.cursor()
-    sql = """
-    SELECT Latitude AS latitude, Longitude AS longitude
-    FROM terminal_data
-    WHERE Device_Id = %s AND Timestamp >= NOW() - INTERVAL %s HOUR
-    ORDER BY Timestamp
-    """
-    cursor.execute(sql, (terminal_id, timeframe))
-    path_data = cursor.fetchall()
-    connection.close()
-    return jsonify(path_data)
-
-# Load GeoJSON data for states and districts
-with open('india_districts.geojson', 'r') as f:
-    data = json.load(f)
-
-# Create a dictionary to store states and their districts
-states_and_districts = {}
-for feature in data['features']:
-    state_name = feature['properties']['NAME_1']
-    district_name = feature['properties']['NAME_2']
     
-    if state_name not in states_and_districts:
-        states_and_districts[state_name] = []
+    end_time = datetime.now()
+    start_time = end_time - timedelta(hours=timeframe)
     
-    states_and_districts[state_name].append(district_name)
+    path_data = TerminalData.query.filter(
+        TerminalData.device_id == terminal_id,
+        TerminalData.timestamp >= start_time,
+        TerminalData.timestamp <= end_time
+    ).order_by(TerminalData.timestamp).all()
+    
+    result = [{
+        'latitude': data.latitude,
+        'longitude': data.longitude,
+        'timestamp': data.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    } for data in path_data]
+    
+    return jsonify(result)
 
-# API route to fetch all states
 @app.route('/api/states', methods=['GET'])
 def get_states():
     states = list(states_and_districts.keys())
     return jsonify(states)
 
-# API route to fetch districts for a specific state
 @app.route('/api/districts', methods=['GET'])
 def get_districts():
     state = request.args.get('state')
@@ -304,58 +238,41 @@ def get_districts():
     
 @app.route('/api/terminals', methods=['GET'])
 def fetch_terminals():
-    state = request.args.get('state')
-    district = request.args.get('district')
     try:
-        connection = connect_to_mysql()
-        cursor = connection.cursor(pymysql.cursors.DictCursor)
-        sql = "SELECT DISTINCT Device_Id AS id, Device_Id AS name FROM terminal_data"
-        if state and district:
-            sql += f" WHERE State = '{state}' AND District = '{district}'"
-        elif state:
-            sql += f" WHERE State = '{state}'"
-        cursor.execute(sql)
-        terminals_data = cursor.fetchall()
-        connection.close()
-        return jsonify(terminals_data)
+        query = db.session.query(TerminalData.device_id).distinct().all()
+        terminals = [{"id": t.device_id, "name": t.device_id} for t in query]
+        return jsonify(terminals)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Error fetching terminals: {str(e)}")
+        return jsonify({'error': 'An error occurred while fetching terminals'}), 500
 
 @app.route('/control')
 def control():
     return render_template('control.html')
 
-# Function to get polygon for a given state and district
 def get_district_polygon(state, district):
     for feature in data['features']:
         if feature['properties']['NAME_1'] == state and feature['properties']['NAME_2'] == district:
             return feature['geometry']['coordinates']
     return None
 
-# Update terminal status in the database
 def update_terminal_status(device_id, status):
     try:
-        connection = connect_to_mysql()
-        cursor = connection.cursor()
-        sql = "UPDATE terminals SET status = %s WHERE device_id = %s"
-        cursor.execute(sql, ('inactive' if status else 'active', device_id))
-        connection.commit()
-        connection.close()
+        terminal = Terminal.query.filter_by(device_id=device_id).first()
+        if terminal:
+            terminal.status = 'inactive' if status else 'active'
+            db.session.commit()
     except Exception as e:
-        print(f"Error updating terminal status: {e}")
+        app.logger.error(f"Error updating terminal status: {e}")
+        db.session.rollback()
 
-# Update all terminals to be active
 def update_all_terminals_active():
     try:
-        connection = connect_to_mysql()
-        cursor = connection.cursor()
-        sql = "UPDATE terminals SET status = 'active'"
-        cursor.execute(sql)
-        connection.commit()
-        connection.close()
+        Terminal.query.update({Terminal.status: 'active'})
+        db.session.commit()
     except Exception as e:
-        print(f"Error updating terminals: {e}")
+        app.logger.error(f"Error updating terminals: {e}")
+        db.session.rollback()
 
-# Start Flask application
 if __name__ == '__main__':
     socketio.run(app, debug=True)

@@ -1,299 +1,140 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="10">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Current Terminal Location</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f6f8;
-            color: #333;
-        }
-
-        header {
-            background-color: #003366;
-            color: white;
-            padding: 20px 0;
-        }
-
-        header .container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-
-        header .logo img {
-            height: 60px;
-        }
-
-        header nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: flex;
-        }
-
-        header nav ul li {
-            margin-left: 20px;
-        }
-
-        header nav ul li a {
-            color: white;
-            text-decoration: none;
-            font-size: 18px;
-        }
-
-        header nav ul li a:hover {
-            text-decoration: underline;
-        }
-
-        main {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: white;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-        }
-
-        h1 {
-            color: #003366;
-            text-align: center;
-            padding-bottom: 20px;
-        }
-
-        .filter-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .filter-container select {
-            margin-right: 10px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        .actions-container {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 20px;
-        }
-
-        #exportButton {
-            padding: 10px 20px;
-            background-color: #003366;
-            color: white;
-            border: none;
-            max-width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        #exportButton:hover {
-            background-color: #002244;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #ddd;
-            text-align: left;
-        }
-
-        th {
-            background-color: #003366;
-            color: white;
-        }
-
-        tbody tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        tbody tr:hover {
-            background-color: #f0f0f0;
-        }
-
-        footer {
-            background-color: #003366;
-            color: white;
-            padding: 10px 0;
-            text-align: center;
-        }
-
-        footer ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-        }
-
-        footer ul li a {
-            color: white;
-            text-decoration: none;
-        }
-
-        footer ul li a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <title>Current Terminal Locations</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
 </head>
-
-<body>
-    <header>
-        <div class="container">
+<body class="bg-gray-100">
+    <header class="bg-blue-900 text-white">
+        <div class="container mx-auto px-4 py-6 flex justify-between items-center">
             <div class="logo">
-                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="h-12"></a>
             </div>
             <nav>
-                <ul>
-                    <li><a href="{{ url_for('home') }}">Home</a></li>
-                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
-                    <li><a id="mapLink" href="{{ url_for('map_page') }}">Map View</a></li>
-                    <li><a href="/path">Track Path</a></li>
-                    <li><a href="/terminal">Terminal History</a></li>
-                    <li><a href="control">Control Terminals</a></li>
+                <ul class="flex space-x-6">
+                    <li><a href="{{ url_for('home') }}" class="hover:underline">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}" class="font-bold underline">Current Location</a></li>
+                    <li><a id="mapLink" href="{{ url_for('map_page') }}" class="hover:underline">Map View</a></li>
+                    <li><a href="/path" class="hover:underline">Track Path</a></li>
+                    <li><a href="/terminal" class="hover:underline">Terminal History</a></li>
+                    <li><a href="/control" class="hover:underline">Control Terminals</a></li>
                 </ul>
             </nav>
         </div>
     </header>
 
-    <main>
-        <h1>Current Terminal Location</h1>
-        <div class="actions-container">
-            <button id="exportButton">Export as CSV</button>
+    <main class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center text-blue-900 mb-8">Current Terminal Locations</h1>
+        
+        <div class="mb-6 flex justify-end">
+            <button id="exportButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition-colors duration-200">
+                Export as CSV
+            </button>
         </div>
-        <div></div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>SAI</th>
-                    <th>Device ID</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th>District</th>
-                    <th>State</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if data %}
-                {% for row in data %}
-                <tr>
-                    <td>{{ row.Timestamp }}</td>
-                    <td>{{ row.SAI }}</td>
-                    <td>{{ row.Device_Id }}</td>
-                    <td>{{ row.Latitude }}</td>
-                    <td>{{ row.Longitude }}</td>
-                    <td>{{ row.District }}</td>
-                    <td>{{ row.State }}</td>
-                    <td>{{ row.Status}}</td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="8">No data available</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
+
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <table id="data-table" class="min-w-full">
+                <thead class="bg-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Timestamp</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">SAI</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Device ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Latitude</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Longitude</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">District</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
     </main>
 
-    <footer>
-        <div class="container">
-            <ul>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Terms</a></li>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Contact Us</a></li>
+    <footer class="bg-blue-900 text-white py-4">
+        <div class="container mx-auto px-4">
+            <ul class="flex justify-center space-x-6">
+                <li><a href="#" class="hover:underline">About</a></li>
+                <li><a href="#" class="hover:underline">Terms</a></li>
+                <li><a href="#" class="hover:underline">Privacy Policy</a></li>
+                <li><a href="#" class="hover:underline">Contact Us</a></li>
             </ul>
         </div>
     </footer>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const historyTableBody = document.querySelector('tbody');
+            const tableBody = document.querySelector('#data-table tbody');
             const exportButton = document.getElementById('exportButton');
+            let allData = [];
+
+            function fetchLatestData() {
+                fetch('/api/latest-terminal-data')
+                    .then(response => response.json())
+                    .then(data => {
+                        allData = data;
+                        updateTable();
+                    });
+            }
+
+            function updateTable() {
+                tableBody.innerHTML = '';
+                allData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-100';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${new Date(row.timestamp).toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.sai}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.device_id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.latitude}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.longitude}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.district}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${row.state}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            // Fetch data initially and set up periodic updates
+            fetchLatestData();
+            setInterval(fetchLatestData, 10000); // Update every 10 seconds
 
             var socket = io();
 
-socket.on('connect', function() {
-    console.log('Connected to server');
-});
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
 
-socket.on('disconnect', function() {
-    console.log('Disconnected from server');
-});
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+            });
 
-socket.on('geofence_update', function(data) {
-    var action = data.action;
-    var terminal = data.terminal;
-    console.log('Geofence update:', action, terminal);
-    updateTableRow(terminal);
-});
+            socket.on('geofence_update', function(data) {
+                console.log('Geofence update:', data);
+                fetchLatestData(); // Refresh data when a geofence update is received
+            });
 
-function updateTableRow(terminal) {
-    $('#data-table tbody tr').each(function() {
-        var row = $(this);
-        if (row.find('td:nth-child(3)').text() === terminal.Device_Id) {
-            row.find('td:nth-child(8)').text(terminal.Status);
-        }
-    });
-}
-            
-            
-
-            // Function to download CSV file
-            function downloadCSV(csv, filename) {
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const downloadLink = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                downloadLink.setAttribute('href', url);
-                downloadLink.setAttribute('download', filename);
-                downloadLink.style.display = 'none';
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-            }
-
-            // Event listener for export button
             exportButton.addEventListener('click', function () {
-                const rows = historyTableBody.querySelectorAll('tr');
-
-                // Prepare CSV header
                 let csv = 'Timestamp,SAI,Device ID,Latitude,Longitude,District,State,Status\n';
-
-                // Generate CSV content from table rows
-                rows.forEach(row => {
-                    const rowData = Array.from(row.children).map(td => td.textContent).join(',');
-                    csv += rowData + '\n';
+                allData.forEach(row => {
+                    csv += `${new Date(row.timestamp).toLocaleString()},${row.sai},${row.device_id},${row.latitude},${row.longitude},${row.district},${row.state},${row.status || 'N/A'}\n`;
                 });
-
-                // Download CSV file
-                const filename = 'current_terminal_location.csv';
-                downloadCSV(csv, filename);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (navigator.msSaveBlob) {
+                    navigator.msSaveBlob(blob, 'current_terminal_locations.csv');
+                } else {
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'current_terminal_locations.csv';
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
             });
         });
     </script>

@@ -4,22 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Current Terminal Location on Map</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>Live Terminal Locations Map</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Roboto', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f6f8;
+            background-color: #f0f2f5;
             color: #333;
         }
 
         header {
-            background-color: #003366;
+            background-color: #1a237e;
             color: white;
-            padding: 20px 0;
+            padding: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         header .container {
@@ -32,7 +32,12 @@
         }
 
         header .logo img {
-            height: 60px;
+            height: 50px;
+            transition: transform 0.3s ease;
+        }
+
+        header .logo img:hover {
+            transform: scale(1.05);
         }
 
         header nav ul {
@@ -43,32 +48,36 @@
         }
 
         header nav ul li {
-            margin-left: 20px;
+            margin-left: 25px;
         }
 
         header nav ul li a {
             color: white;
             text-decoration: none;
-            font-size: 18px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: color 0.3s ease;
         }
 
         header nav ul li a:hover {
-            text-decoration: underline;
+            color: #64b5f6;
         }
 
         main {
             max-width: 1200px;
-            margin: 20px auto;
-            padding: 20px;
+            margin: 30px auto;
+            padding: 30px;
             background-color: white;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             border-radius: 8px;
         }
 
         h1 {
-            color: #003366;
+            color: #1a237e;
             text-align: center;
             padding-bottom: 20px;
+            font-size: 28px;
+            font-weight: 700;
         }
 
         .selectors {
@@ -76,27 +85,42 @@
             justify-content: center;
             align-items: center;
             gap: 20px;
-            padding-bottom: 20px;
+            padding-bottom: 25px;
         }
 
         .selectors select {
-            padding: 10px;
+            padding: 10px 15px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
+            background-color: #fff;
+            color: #333;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .selectors select:hover {
+            border-color: #1a237e;
+        }
+
+        .selectors select:focus {
+            outline: none;
+            border-color: #1a237e;
+            box-shadow: 0 0 0 2px rgba(26,35,126,0.2);
         }
 
         #map {
-            height: 500px;
+            height: 600px;
             margin-top: 20px;
             border-radius: 8px;
             overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         footer {
-            background-color: #003366;
+            background-color: #1a237e;
             color: white;
-            padding: 10px 0;
+            padding: 20px 0;
             text-align: center;
         }
 
@@ -106,16 +130,18 @@
             margin: 0;
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 30px;
         }
 
         footer ul li a {
             color: white;
             text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s ease;
         }
 
         footer ul li a:hover {
-            text-decoration: underline;
+            color: #64b5f6;
         }
 
         .loading-indicator {
@@ -125,34 +151,68 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 5px;
+            padding: 20px 40px;
+            border-radius: 30px;
             text-align: center;
             font-size: 18px;
-            color: #003366;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            color: #1a237e;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             transition: opacity 0.3s;
         }
 
         .loading-indicator.active {
-            display: block;
+            display: flex;
+            align-items: center;
             opacity: 1;
+        }
+
+        .loading-indicator::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 3px solid #1a237e;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            margin-left: 15px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
             header .container {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: center;
+            }
+
+            header nav ul {
+                margin-top: 15px;
+            }
+
+            header nav ul li {
+                margin-left: 15px;
+                margin-right: 15px;
             }
 
             .selectors {
                 flex-direction: column;
-                gap: 10px;
+                gap: 15px;
+            }
+
+            .selectors select {
+                width: 100%;
             }
 
             footer ul {
                 flex-direction: column;
-                gap: 10px;
+                gap: 15px;
+            }
+
+            #map {
+                height: 400px;
             }
         }
     </style>
@@ -177,7 +237,7 @@
         </div>
     </header>
     <main>
-        <h1>Current Terminal Location on Map</h1>
+        <h1>Live Terminal Locations Map</h1>
         <div class="selectors">
             <select id="stateSelector">
                 <option value="">All States</option>
@@ -201,6 +261,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const map = L.map('map').setView([20.5937, 78.9629], 5); // Centered on India
@@ -217,23 +278,19 @@
                 shadowSize: [41, 41]
             });
 
-            const markerLayer = L.layerGroup().addTo(map);
+            const markers = {};
             const loadingIndicator = document.getElementById('loadingIndicator');
-
             const stateSelector = document.getElementById('stateSelector');
             const districtSelector = document.getElementById('districtSelector');
 
-            // Show loading indicator with animation
             function showLoadingIndicator() {
                 loadingIndicator.classList.add('active');
             }
 
-            // Hide loading indicator with animation
             function hideLoadingIndicator() {
                 loadingIndicator.classList.remove('active');
             }
 
-            // Fetch states from the API
             function fetchStates() {
                 axios.get('/api/states')
                     .then(response => {
@@ -251,7 +308,6 @@
                     });
             }
 
-            // Fetch districts based on the selected state
             function fetchDistricts(state) {
                 axios.get('/api/districts', { params: { state } })
                     .then(response => {
@@ -270,13 +326,36 @@
                     });
             }
 
-            // Fetch and update terminals on the map
+            function updateMarker(terminal) {
+                if (terminal.latitude && terminal.longitude) {
+                    const filteredState = stateSelector.value;
+                    const filteredDistrict = districtSelector.value;
+
+                    if ((filteredState === '' || terminal.state === filteredState) &&
+                        (filteredDistrict === '' || terminal.district === filteredDistrict)) {
+                        if (markers[terminal.device_id]) {
+                            markers[terminal.device_id].setLatLng([terminal.latitude, terminal.longitude]);
+                        } else {
+                            markers[terminal.device_id] = L.marker([terminal.latitude, terminal.longitude], { icon: customIcon })
+                                .bindPopup(`<strong>Terminal ID:</strong> ${terminal.device_id}<br><strong>District:</strong> ${terminal.district}<br><strong>State:</strong> ${terminal.state}`)
+                                .addTo(map);
+                        }
+                    } else if (markers[terminal.device_id]) {
+                        map.removeLayer(markers[terminal.device_id]);
+                        delete markers[terminal.device_id];
+                    }
+                }
+            }
+
             function fetchAndUpdateTerminals(state = '', district = '') {
                 showLoadingIndicator();
-                axios.get('/api/get-terminals-by-location', { params: { state, district } })
+                axios.get('/api/latest-terminal-data')
                     .then(response => {
                         const terminals = response.data;
-                        updateMap(terminals);
+                        const markersToRemove = Object.values(markers).map(marker => marker);  // Create an array of markers to remove
+
+markersToRemove.forEach(marker => map.removeLayer(marker));  // Loop through the new array and remove markers
+                        terminals.forEach(terminal => updateMarker(terminal));
                     })
                     .catch(error => {
                         console.error(error);
@@ -285,19 +364,6 @@
                     .finally(() => hideLoadingIndicator());
             }
 
-            // Update map markers
-            function updateMap(terminals) {
-                markerLayer.clearLayers();
-                terminals.forEach(item => {
-                    if (item.Latitude && item.Longitude) {
-                        L.marker([item.Latitude, item.Longitude], { icon: customIcon })
-                            .bindPopup(`<strong>Terminal ID:</strong> ${item.Device_Id}<br><strong>District:</strong> ${item.District}<br><strong>State:</strong> ${item.State}`)
-                            .addTo(markerLayer);
-                    }
-                });
-            }
-
-            // Event listeners for selectors
             stateSelector.addEventListener('change', function () {
                 const state = stateSelector.value;
                 fetchDistricts(state);
@@ -310,9 +376,23 @@
                 fetchAndUpdateTerminals(state, district);
             });
 
-            // Initial fetch of states and terminals
             fetchStates();
             fetchAndUpdateTerminals();
+
+            // WebSocket connection for real-time updates
+            const socket = io();
+
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+            });
+
+            socket.on('terminal_update', function(data) {
+                updateMarker(data);
+            });
         });
     </script>
 </body>
