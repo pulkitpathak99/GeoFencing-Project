@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geofence Control</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        :root {
+            --primary-color: #003366;
+            --secondary-color: #ffffff;
+            --accent-color: #4DC9E6;
+            --gradient-start: #E6F3FF;
+            --gradient-end: #B3D9FF;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--primary-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+        }
+        
+        .background-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: -1;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(255,255,255,0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(255,255,255,0.1) 0%, transparent 20%),
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 30%);
+            animation: pulse 15s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        header {
+  background: linear-gradient(135deg, var(--primary-color), #0056b3);
+  color: var(--white);
+  padding: 1rem 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+header .logo img {
+  height: 60px;
+  transition: transform 0.3s ease;
+}
+
+header .logo img:hover {
+  transform: scale(1.05);
+}
+
+header nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+}
+
+header nav ul li {
+  margin-left: 1.5rem;
+}
+
+:root {
+  --primary-color: #003366;
+  --secondary-color: #64b5f6;
+  --accent-color: #f57c00;
+  --background-color: #f4f6f8;
+  --text-color: #333;
+  --white: #ffffff;
+  --success-color: #4CAF50;
+  --warning-color: #FFC107;
+  --error-color: #F44336;
+}
+
+header nav ul li a {
+  color: var(--white);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+header nav ul li a:hover,
+header nav ul li a.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+header nav ul li .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--primary-color);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            min-width: 200px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        header nav ul li .dropdown-content a {
+            display: block;
+            padding: 0.5rem 1rem;
+        }
+
+        header nav ul li .dropdown-content a:hover {
+            background-color: var(--secondary-color);
+        }
+
+        header nav ul li:hover .dropdown-content {
+            display: block;
+        }
+
+        
+        header {
+            background-color: var(--primary-color);
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo img {
+            height: 60px;
+        }
+        
+        .user-actions {
+            display: flex;
+            align-items: center;
+            color: var(--secondary-color);
+        }
+        
+        .user-actions i {
+            font-size: 2rem;
+            margin-right: 1rem;
+        }
+        
+        .logout-btn {
+            background-color: var(--accent-color);
+            color: var(--primary-color);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background-color: #3BA9C6;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        #map {
+            height: 500px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        #terminalTable {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .terminal-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .terminal-row:last-child {
+            border-bottom: none;
+        }
+        
+        .terminal-info {
+            flex-grow: 1;
+        }
+        
+        .toggle-btn {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle-btn:hover {
+            background-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }.custom-draw-control {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .custom-draw-control button {
+            background-color: var(--accent-color);
+            color: var(--primary-color);
+            border: none;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .custom-draw-control button:hover {
+            background-color: #3BA9C6;
+            transform: translateY(-2px);
+        }
+        
+        #terminalTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        #terminalTable th, #terminalTable td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        #terminalTable th {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+        }
+        
+        #terminalTable tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        #terminalTable tr:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .status-active {
+            color: #4CAF50;
+        }
+        
+        .status-inactive {
+            color: #F44336;
+        }#terminalTable {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #terminalTable th, #terminalTable td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        #terminalTable th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #terminalTable tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        #terminalTable tr:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .toggle-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            background-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="#"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="/path">Track Path</a></li>
+                    <li><a href="/terminal">Terminal History</a></li>
+                    <li><a class="active" href="/control">Control Terminals</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <main>
+        <h1>Geofence Control</h1>
+        <div id="map"></div>
+        <table id="terminalTable">
+            <thead>
+                <tr>
+                    <th>Timeframe</th>
+                    <th>Device ID</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>Toggle</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table rows will be dynamically inserted here -->
+            </tbody>
+        </table>
+        <div id="loading" class="loading">Processing...</div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {
+            attribution: '© MapTiler © OpenStreetMap contributors'
+        }).addTo(map);
+
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        const drawControl = new L.Control.Draw({
+            draw: {
+                polygon: true,
+                polyline: false,
+                rectangle: true,
+                circle: false,
+                marker: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+        map.addControl(drawControl);
+
+        let currentGeofence = null;
+        let terminals = [];
+
+        map.on(L.Draw.Event.CREATED, function (event) {
+            drawnItems.clearLayers();
+            const layer = event.layer;
+            drawnItems.addLayer(layer);
+            currentGeofence = layer.toGeoJSON();
+            fetchTerminalsInGeofence();
+        });
+
+        map.on(L.Draw.Event.DELETED, function () {
+            currentGeofence = null;
+            updateTerminalTable([]);
+        });
+
+        function fetchTerminalsInGeofence() {
+            if (!currentGeofence) return;
+
+            document.getElementById('loading').style.display = 'block';
+
+            fetch('/api/terminals-in-geofence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ geofence: currentGeofence }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(terminal => {
+                    terminals[terminal.id] = terminal;
+                });
+                updateTerminalTable();
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        function updateTerminalTable() {
+            const tableBody = document.querySelector('#terminalTable tbody');
+            if (Object.keys(terminals).length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5">No terminals found in the geofence.</td></tr>';
+                return;
+            }
+
+            let tableHtml = '';
+
+            Object.values(terminals).forEach(terminal => {
+                tableHtml += `
+                    <tr>
+                        <td></td>
+                        <td>${terminal.id}</td>
+                        <td class="lat">${terminal.lat}</td>
+                        <td class="lon">${terminal.lon}</td>
+                        <td>
+                            <button class="toggle-btn" onclick="toggleTerminal('${terminal.id}')">
+                                ${terminal.status === 'active' ? 'Disable' : 'Enable'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = tableHtml;
+        }
+
+        function toggleTerminal(terminalId) {
+            document.getElementById('loading').style.display = 'block';
+
+            const terminal = terminals[terminalId];
+            const newStatus = terminal.status === 'active' ? 'inactive' : 'active';
+
+            fetch('/api/toggle-terminal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ terminal_id: terminalId, status: newStatus }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    terminal.status = newStatus;
+                    updateTerminalTable();
+                    alert(data.message);
+                } else {
+                    alert('Failed to update terminal status: ' + data.error);
+                }
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        // WebSocket connection for real-time updates
+        const socket = io();
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+
+        socket.on('terminal_update', function(data) {
+            if (currentGeofence) {
+                const point = turf.point([data.longitude, data.latitude]);
+                if (turf.booleanPointInPolygon(point, currentGeofence)) {
+                    if (terminals[data.device_id]) {
+                        terminals[data.device_id].lat = data.latitude;
+                        terminals[data.device_id].lon = data.longitude;
+                        updateTerminalTable();
+                    } else {
+                        terminals[data.device_id] = {
+                            id: data.device_id,
+                            lat: data.latitude,
+                            lon: data.longitude,
+                            status: 'active'
+                        };
+                        updateTerminalTable();
+                    }
+                } else if (terminals[data.device_id]) {
+                    delete terminals[data.device_id];
+                    updateTerminalTable();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

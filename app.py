@@ -7,6 +7,9 @@ import json
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy import desc
+from pyle38 import Tile38
+import paho.mqtt.client as mqtt
+from flask_migrate import Migrate
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -15,6 +18,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'postgresql://
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Initialize Tile38 client
+tile38 = Tile38(url="redis://localhost:9851")
+
+# Initialize MQTT client
+mqtt_client = mqtt.Client()
+mqtt_client.connect("localhost", 1883, 60)
+mqtt_client.loop_start()
+
 
 # Define models
 class TerminalData(db.Model):
@@ -27,7 +39,142 @@ class TerminalData(db.Model):
     longitude = db.Column(db.Float)
     district = db.Column(db.String(100))
     state = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='active')
 
+# Load GeoJSON data for states and districts
+
+class Geofence(db.Model):
+    __tablename__ = 'geofences'
+    id = db.Column(db.Integer, primary_key=True)
+    state = db.Column(db.String(100), nullable=False)
+    district = db.Column(db.String(100), nullable=False)
+    
+    def __repr__(self):
+        return f'<Geofence {self.state}, {self.district}>'
+
+# ... (keep existing route handlers)
+
+@app.route('/api/set_geofence', methods=['POST'])
+def set_geofence():
+    data = request.json
+    state = data.get('state')
+    district = data.get('district')
+    
+    if not state or not district:
+        return jsonify({'success': False, 'message': 'State and district are required'}), 400
+
+    # Check if geofence already exists
+    existing_geofence = Geofence.query.filter_by(state=state, district=district).first()
+    if existing_geofence:
+        return jsonify({'success': False, 'message': 'Geofence already exists'}), 400
+
+    # Add new geofence
+    new_geofence = Geofence(state=state, district=district)
+    db.session.add(new_geofence)
+    db.session.commit()
+
+    # Set up Tile38 geofence
+    polygon = get_district_polygon(state, district)
+    if polygon:
+        tile38.set(f"geofence:{state}:{district}", polygon)
+        tile38.sethook(f"hook:{state}:{district}", "/api/geofence_webhook", "enter,exit", f"geofence:{state}:{district}")
+
+    # Notify terminals in the area via MQTT
+    notify_terminals(state, district, 'disable')
+
+    return jsonify({'success': True, 'message': 'Geofence set successfully'})
+
+@app.route('/api/remove_geofence', methods=['POST'])
+def remove_geofence():
+    data = request.json
+    state = data.get('state')
+    district = data.get('district')
+    
+    if not state or not district:
+        return jsonify({'success': False, 'message': 'State and district are required'}), 400
+
+    # Remove the geofence
+    Geofence.query.filter_by(state=state, district=district).delete()
+    db.session.commit()
+
+    # Remove Tile38 geofence
+    tile38.del_(f"geofence:{state}:{district}")
+    tile38.delhook(f"hook:{state}:{district}")
+
+    # Notify terminals in the area via MQTT
+    notify_terminals(state, district, 'enable')
+
+    return jsonify({'success': True, 'message': 'Geofence removed successfully'})
+
+@app.route('/api/get_terminals', methods=['GET'])
+def get_terminals():
+    state = request.args.get('state')
+    district = request.args.get('district')
+    
+    query = TerminalData.query
+
+    if state:
+        query = query.filter_by(state=state)
+    if district:
+        query = query.filter_by(district=district)
+
+    terminals = query.all()
+    return jsonify([{
+        'device_id': t.device_id,
+        'status': 'active',  # Default status as active
+        'state': t.state,
+        'district': t.district
+    } for t in terminals])
+
+
+def notify_terminals(state, district, action):
+    terminals = TerminalData.query.filter_by(state=state, district=district).all()
+    for terminal in terminals:
+        mqtt_client.publish(f"terminal/{terminal.device_id}/control", action)
+
+# Webhook endpoint for Tile38 notifications
+
+def get_district_polygon(state, district):
+    # Implement this function to return the polygon coordinates for the given state and district
+    # You'll need to load and process your GeoJSON data here
+    pass
+
+
+def notify_terminals(state, district, action):
+    terminals = TerminalData.query.filter_by(state=state, district=district).all()
+    for terminal in terminals:
+        mqtt_client.publish(f"terminal/{terminal.device_id}/control", action)
+
+# Webhook endpoint for Tile38 notifications
+@app.route('/api/geofence_webhook/<geofence_key>', methods=['POST'])
+def geofence_webhook(geofence_key):
+    try:
+        data = request.json
+        device_id = data['id']
+        action = data['detect']  # 'enter' or 'exit'
+
+        # Update terminal status in the database
+        terminal = TerminalData.query.filter_by(device_id=device_id).order_by(TerminalData.timestamp.desc()).first()
+        if terminal:
+            if action == 'enter':
+                terminal.status = 'inactive'
+            elif action == 'exit':
+                terminal.status = 'active'
+            db.session.commit()
+
+        # Emit a Socket.IO event to notify clients
+        socketio.emit('geofence_update', {'device_id': device_id, 'action': action, 'geofence': geofence_key})
+
+        # Send MQTT message to control terminal transmission
+        mqtt_topic = f"terminal/{device_id}/control"
+        mqtt_message = "disable" if action == 'enter' else "enable"
+        mqtt_client.publish(mqtt_topic, mqtt_message)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Error in geofence webhook: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 class Terminal(db.Model):
     __tablename__ = 'terminals'
     id = db.Column(db.Integer, primary_key=True)
@@ -184,19 +331,19 @@ def fetch_terminals_by_location():
 
 @app.route('/api/terminals-by-location', methods=['GET'])
 def get_terminals_by_location():
-    state = request.args.get('state')
-    district = request.args.get('district')
-    
-    if not state or not district:
-        return jsonify({'error': 'Both state and district are required'}), 400
-
     try:
+        state = request.args.get('state')
+        district = request.args.get('district')
+        
+        if not state or not district:
+            return jsonify({'error': 'Both state and district are required'}), 400
+
         terminals = TerminalData.query.filter_by(state=state, district=district).order_by(TerminalData.device_id).all()
         result = [{'device_id': terminal.device_id, 'latitude': terminal.latitude, 'longitude': terminal.longitude} for terminal in terminals]
         return jsonify(result)
     except Exception as e:
         logging.error(f"Error fetching terminals by location: {str(e)}")
-        return jsonify({'error': 'Failed to fetch terminals'}), 500
+        return jsonify({'error': f'Failed to fetch terminals: {str(e)}'}), 500
 
 @app.route('/api/path')
 def get_terminal_path():
@@ -274,5 +421,66 @@ def update_all_terminals_active():
         app.logger.error(f"Error updating terminals: {e}")
         db.session.rollback()
 
+import json
+from shapely.geometry import shape, Point
+import paho.mqtt.publish as publish
+
+# ... (existing code)
+
+@app.route('/geofence-control')
+def geofence_control():
+    return render_template('geofence.html')
+
+@app.route('/api/terminals-in-geofence', methods=['POST'])
+def terminals_in_geofence():
+    geofence = request.json.get('geofence')
+    if not geofence:
+        return jsonify({'error': 'Geofence not provided'}), 400
+
+    try:
+        geofence_shape = shape(geofence['geometry'])
+        terminals = TerminalData.query.all()
+        terminals_in_geofence = []
+
+        for terminal in terminals:
+            point = Point(terminal.longitude, terminal.latitude)
+            if geofence_shape.contains(point):
+                terminals_in_geofence.append({
+                    'id': terminal.device_id,
+                    'lat': terminal.latitude,
+                    'lon': terminal.longitude,
+                    'status': terminal.status
+                })
+
+        return jsonify(terminals_in_geofence)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/toggle-terminal', methods=['POST'])
+def toggle_terminal():
+    terminal_id = request.json.get('terminal_id')
+    new_status = request.json.get('status')
+
+    if not terminal_id or new_status not in ['active', 'inactive']:
+        return jsonify({'error': 'Invalid request'}), 400
+
+    try:
+        terminal = TerminalData.query.filter_by(device_id=terminal_id).order_by(TerminalData.timestamp.desc()).first()
+        if not terminal:
+            return jsonify({'error': 'Terminal not found'}), 404
+
+        terminal.status = new_status
+        db.session.commit()
+
+        # Send MQTT message (you'll need to implement this part)
+        mqtt_client.publish(f"terminal/{terminal_id}/control", new_status)
+
+        return jsonify({'success': True, 'message': f'Terminal {terminal_id} status changed to {new_status}'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     socketio.run(app, debug=True)

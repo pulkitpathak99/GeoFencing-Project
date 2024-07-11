@@ -2,17 +2,13 @@ import csv
 import json
 import os
 import random
-from psycopg2.extras import execute_values
-import psycopg2
 import time
-
 from datetime import datetime
 from random import uniform
 from shapely.geometry import shape, Point, Polygon
-
-#
-
-
+import psycopg2
+from psycopg2.extras import execute_values
+from pyle38 import Tile38
 
 # Database Configuration
 DB_CONFIG = {
@@ -133,16 +129,16 @@ class DatabaseManager:
             error_index INT,
             vsat_mgmt_addr TEXT,
             num_msg_processed INT,
-            status VARCHAR(20) DEFAULT ACTIVE
+            status VARCHAR(20) DEFAULT 'ACTIVE'
         );
         """
         with self.connection.cursor() as cursor:
             cursor.execute(create_table_sql)
 
-        create_table_sql="""
+        create_table_sql = """
         CREATE TABLE IF NOT EXISTS terminals (
-        id SERIAL PRIMARY KEY,
-        device_id VARCHAR(255) NOT NULL
+            id SERIAL PRIMARY KEY,
+            device_id VARCHAR(255) NOT NULL
         );
         """
         with self.connection.cursor() as cursor:
@@ -181,53 +177,65 @@ class TerminalDataGenerator:
             latitude, longitude = generate_coordinates(coords[0], coords[1])
             district = get_district_from_coordinates(latitude, longitude, self.district_features)
             state = get_state_from_coordinates(latitude, longitude, self.states_shapes)
-            device_id=self.device_id_start+ str(i)
+            device_id = self.device_id_start + str(i)
+            status = self.get_terminal_status(device_id, latitude, longitude)
 
             data = (
                 timestamp, self.sai_start + i, device_id, random.randint(1000, 10000),
                 random.randint(1, 1000), 'Yes' if random.random() > 0.5 else 'No', latitude, longitude,
                 district, state, round(uniform(0, 120), 2), round(uniform(0, 360), 2), round(uniform(0, 360), 2),
-                round(uniform(0, 90), 2), round(uniform(0, 20), 2), round(uniform(0, 20), 2),
-                'Rate' + str(random.randint(1, 5)), round(uniform(0, 30), 2), round(uniform(0, 30), 2),
-                'Beam_' + str(random.randint(1, 5)), 'Yes' if random.random() > 0.5 else 'No',
-                'Beam_' + str(random.randint(1, 5)), random.randint(0, 10), 'Addr_' + str(random.randint(1, 100)),
-                random.randint(1, 100)
+                round(uniform(0, 90), 2), round(uniform(-10, 50), 2), round(uniform(-10, 50), 2),
+                'Some Rate String', round(uniform(-50, 50), 2), round(uniform(-50, 50), 2), 'Some Beam ID',
+                'Yes' if random.random() > 0.5 else 'No', 'Some Sat Beam ID', random.randint(0, 10),
+                'Some Management Addr', random.randint(0, 1000), status
             )
             data_to_write.append(data)
-            self.initial_coordinates[i] = (latitude, longitude)
         return data_to_write
 
-    def insert_data(self, data):
-        insert_sql = """
-        INSERT INTO terminal_data (
-            timestamp, sai, device_id, sbc_id, sequence_num, mlr_option_flag,
-            latitude, longitude, district, state, velocity, track_angle,
-            azimuth, elevation, rx_esno, tx_esno, rate_string, modem_output_power,
-            cal_ant_eirp, mlr_sat_beam_id, mbs_option_flag, mbs_sat_beam_id,
-            error_index, vsat_mgmt_addr, num_msg_processed
-        ) VALUES %s
-        """
-        self.db_manager.execute(insert_sql, data)
-        insert_sql = '''
-        INSERT INTO terminal (SELECT DISTINCT device_id FROM terminal_data);
-        '''
-        self.db_manager.execute(insert_sql)
-        self.db_manager.commit()
+    def get_terminal_status(self, device_id, latitude, longitude):
+    try:
+        tile38 = Tile38('localhost', 9851)
+        response = tile38.intersects('geofences').bounds(latitude - 0.0001, longitude - 0.0001, latitude + 0.0001, longitude + 0.0001).asObjects()
+        if response['ok']:
+            if response['objects']:
+                return 'DISABLED'
+            else:
+                return 'ACTIVE'
+        else:
+            return 'ACTIVE'
+    except Exception as e:
+        print(f"Tile38 query error: {e}")
+        return 'ACTIVE'
 
-# Main execution
+
+# Main function to run the data generator
 def main():
+    geojson_path = 'india_taluk.geojson'
     db_manager = DatabaseManager(DB_CONFIG)
     db_manager.connect()
 
-    try:
-        data_generator = TerminalDataGenerator(db_manager, 'india_districts.geojson')
-        while True:
-            data = data_generator.generate_data()
-            data_generator.insert_data(data)
-            print("Data generated and inserted at", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            time.sleep(10)
-    finally:
-        db_manager.close()
+    data_generator = TerminalDataGenerator(db_manager, geojson_path)
+
+    while True:
+        try:
+            generated_data = data_generator.generate_data()
+            write_to_csv(generated_data)
+            insert_query = """
+                INSERT INTO terminal_data (
+                    timestamp, sai, device_id, sbc_id, sequence_num, mlr_option_flag, latitude, longitude,
+                    district, state, velocity, track_angle, azimuth, elevation, rx_esno, tx_esno, rate_string,
+                    modem_output_power, cal_ant_eirp, mlr_sat_beam_id, mbs_option_flag, mbs_sat_beam_id,
+                    error_index, vsat_mgmt_addr, num_msg_processed, status
+                ) VALUES %s
+            """
+            db_manager.execute(insert_query, generated_data)
+            db_manager.commit()
+            print("Data inserted successfully")
+            time.sleep(60)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            db_manager.close()
+            break
 
 if __name__ == "__main__":
     main()

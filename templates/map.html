@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <style>
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f0f2f5;
@@ -16,52 +16,93 @@
         }
 
         header {
-            background-color: #1a237e;
-            color: white;
-            padding: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, var(--primary-color), #0056b3);
+  color: var(--white);
+  padding: 1rem 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+header .logo img {
+  height: 60px;
+  transition: transform 0.3s ease;
+}
+
+header .logo img:hover {
+  transform: scale(1.05);
+}
+
+header nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+}
+
+header nav ul li {
+  margin-left: 1.5rem;
+}
+
+header nav ul li a {
+  color: var(--white);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+header nav ul li a:hover,
+header nav ul li a.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+    :root {
+  --primary-color: #003366;
+  --secondary-color: #64b5f6;
+  --accent-color: #f57c00;
+  --background-color: #f4f6f8;
+  --text-color: #333;
+  --white: #ffffff;
+  --success-color: #4CAF50;
+  --warning-color: #FFC107;
+  --error-color: #F44336;
+}
+
+header nav ul li .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--primary-color);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            min-width: 200px;
+            border-radius: 4px;
+            overflow: hidden;
         }
 
-        header .container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+        header nav ul li .dropdown-content a {
+            display: block;
+            padding: 0.5rem 1rem;
         }
 
-        header .logo img {
-            height: 50px;
-            transition: transform 0.3s ease;
+        header nav ul li .dropdown-content a:hover {
+            background-color: var(--secondary-color);
         }
 
-        header .logo img:hover {
-            transform: scale(1.05);
+        header nav ul li:hover .dropdown-content {
+            display: block;
         }
 
-        header nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: flex;
-        }
-
-        header nav ul li {
-            margin-left: 25px;
-        }
-
-        header nav ul li a {
-            color: white;
-            text-decoration: none;
-            font-size: 16px;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        header nav ul li a:hover {
-            color: #64b5f6;
-        }
 
         main {
             max-width: 1200px;
@@ -228,41 +269,52 @@
                 <ul>
                     <li><a href="{{ url_for('home') }}">Home</a></li>
                     <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
-                    <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                    <li><a href="{{ url_for('map_page') }}" class="active">Map View</a></li>
                     <li><a href="/path">Track Path</a></li>
                     <li><a href="/terminal">Terminal History</a></li>
-                    <li><a href="/control">Control Terminals</a></li>
+                    <li class="dropdown">
+                        <a href="#" class="dropbtn">Control Terminals</a>
+                        <div class="dropdown-content">
+                            <a href="/control">Control Terminals</a>
+                            <a href="/geofence-control">Geofence Control</a>
+                        </div>
+                    </li>
                 </ul>
             </nav>
         </div>
     </header>
     <main>
         <h1>Live Terminal Locations Map</h1>
-        <div class="selectors">
-            <select id="stateSelector">
-                <option value="">All States</option>
-            </select>
-            <select id="districtSelector">
-                <option value="">All Districts</option>
-            </select>
+        <div class="card">
+            <div class="selectors">
+                <select id="stateSelector">
+                    <option value="">All States</option>
+                </select>
+                <select id="districtSelector">
+                    <option value="">All Districts</option>
+                </select>
+            </div>
+            <div id="map"></div>
+            <div id="loadingIndicator" class="loading-indicator">Loading...</div>
         </div>
-        <div id="map"></div>
-        <div id="loadingIndicator" class="loading-indicator">Loading...</div>
     </main>
     <footer>
-        <ul>
-            <li><a href="{{ url_for('home') }}">Home</a></li>
-            <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
-            <li><a href="{{ url_for('map_page') }}">Map View</a></li>
-            <li><a href="/path">Track Path</a></li>
-            <li><a href="/terminal">Terminal History</a></li>
-        </ul>
+        <div class="container">
+            <ul>
+                <li><a href="{{ url_for('home') }}">Home</a></li>
+                <li><a href="{{ url_for('get_latest_data') }}">Current Location</a></li>
+                <li><a href="{{ url_for('map_page') }}">Map View</a></li>
+                <li><a href="/path">Track Path</a></li>
+                <li><a href="/terminal">Terminal History</a></li>
+            </ul>
+        </div>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
+
         document.addEventListener('DOMContentLoaded', function () {
             const map = L.map('map').setView([20.5937, 78.9629], 5); // Centered on India
             L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=wP321pEI0NlgtSZjA8kP', {

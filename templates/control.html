@@ -6,24 +6,29 @@
     <title>Terminal Control and Geofencing</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-        .geofence-controls {
+        .geofence-controls, .terminal-controls {
             margin-top: 20px;
             padding: 20px;
+            border: 1px solid #ddd;
             border-radius: 8px;
-            transition: background-color 0.3s ease;
+            background-color: #f9f9f9;
         }
-        .geofence-inactive {
-            background-color: #ffcccc;
-        }
-        .geofence-active {
-            background-color: #ccffcc;
-        }
-        #geofenceStatus {
+        #geofenceStatus, #terminalStatus {
             margin-top: 20px;
             font-weight: bold;
         }
         #terminalList {
             margin-top: 20px;
+        }
+        .terminal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .terminal-item:last-child {
+            border-bottom: none;
         }
         .loading {
             display: none;
@@ -47,19 +52,32 @@
             padding: 5px;
             width: 100%;
         }
-        #map {
-            height: 500px;
-            margin-top: 20px;
-            border-radius: 8px;
+
+        header nav ul li .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--primary-color);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            min-width: 200px;
+            border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 20px;
-            background-color: #eee;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
+
+        header nav ul li .dropdown-content a {
+            display: block;
+            padding: 0.5rem 1rem;
+        }
+
+        header nav ul li .dropdown-content a:hover {
+            background-color: var(--secondary-color);
+        }
+
+        header nav ul li:hover .dropdown-content {
+            display: block;
+        }
+
     </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.css">
 </head>
 <body>
     <header>
@@ -74,7 +92,7 @@
                     <li><a href="{{ url_for('map_page') }}">Map View</a></li>
                     <li><a href="/path">Track Path</a></li>
                     <li><a href="/terminal">Terminal History</a></li>
-                    <li><a href="/control">Control Terminals</a></li>
+                    <li><a class="active" href="/control">Control Terminals</a></li>
                 </ul>
             </nav>
         </div>
@@ -82,15 +100,13 @@
     
     <main>
         <h1>Terminal Control and Geofencing</h1>
-        <div id="geofenceControls" class="geofence-controls geofence-inactive">
+        <div class="geofence-controls">
             <h2>Geofence Selection</h2>
             <select id="stateSelector">
                 <option value="">Select State</option>
-                <!-- States will be populated dynamically -->
             </select>
             <select id="districtSelector" disabled>
                 <option value="">Select District</option>
-                <!-- Districts will be populated dynamically -->
             </select>
             <button id="setGeofenceBtn">Set Geofence</button>
             <button id="removeGeofenceBtn" disabled>Remove Geofence</button>
@@ -100,229 +116,276 @@
         <div id="message"></div>
         
         <div id="geofenceStatus"></div>
-
-        <div id="map"></div>
         
-        <div id="terminalList">
+        <div class="terminal-controls">
             <h2>Terminals in Selected Area</h2>
             <input type="text" id="searchTerminal" placeholder="Search terminals...">
-            <ul id="terminals"></ul>
+            <div id="terminalList"></div>
             <div id="terminalLoading" class="loading">Loading terminals...</div>
         </div>
     </main>
 
     <footer>
-        <!-- Add your footer content here -->
+        <!-- Add footer content here -->
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const socket = io();
             const stateSelector = document.getElementById('stateSelector');
             const districtSelector = document.getElementById('districtSelector');
             const setGeofenceBtn = document.getElementById('setGeofenceBtn');
             const removeGeofenceBtn = document.getElementById('removeGeofenceBtn');
-            const geofenceStatus = document.getElementById('geofenceStatus');
-            const terminalsList = document.getElementById('terminals');
-            const geofenceControls = document.getElementById('geofenceControls');
-            const messageDiv = document.getElementById('message');
             const geofenceLoading = document.getElementById('geofenceLoading');
+            const messageDiv = document.getElementById('message');
+            const geofenceStatus = document.getElementById('geofenceStatus');
+            const terminalList = document.getElementById('terminalList');
             const terminalLoading = document.getElementById('terminalLoading');
             const searchTerminal = document.getElementById('searchTerminal');
 
-            const socket = io();
-
-            function showLoading(element) {
-                element.style.display = 'inline';
-            }
-
-            function hideLoading(element) {
-                element.style.display = 'none';
-            }
-
-            function showMessage(message, isError = false) {
-                messageDiv.textContent = message;
-                messageDiv.className = isError ? 'error' : 'success';
+            function showMessage(type, text) {
+                messageDiv.className = type;
+                messageDiv.textContent = text;
+                messageDiv.style.display = 'block';
                 setTimeout(() => {
-                    messageDiv.textContent = '';
-                    messageDiv.className = '';
-                }, 5000);
+                    messageDiv.style.display = 'none';
+                }, 3000);
             }
 
-            // Initialize the map
-            const map = new maplibregl.Map({
-                container: 'map',
-                style: 'https://api.maptiler.com/maps/3b48981a-25dc-40c0-9b6b-619ecc993cac/style.json?key=FOyZkXDF4F9KoYryoIxb',
-                center: [78.9629, 20.5937], // Center of India
-                zoom: 4
-            });
-
-            // Fetch states
-            showLoading(geofenceLoading);
-            fetch('/api/states')
-                .then(response => response.json())
-                .then(states => {
-                    states.forEach(state => {
-                        const option = document.createElement('option');
-                        option.value = state;
-                        option.textContent = state;
-                        stateSelector.appendChild(option);
-                    });
-                    hideLoading(geofenceLoading);
-                })
-                .catch(error => {
-                    console.error('Error fetching states:', error);
-                    hideLoading(geofenceLoading);
-                });
-
-            stateSelector.addEventListener('change', function() {
-                const selectedState = stateSelector.value;
-                districtSelector.innerHTML = '<option value="">Select District</option>';
-                if (selectedState) {
-                    showLoading(geofenceLoading);
-                    fetch(`/api/districts?state=${selectedState}`)
-                        .then(response => response.json())
-                        .then(districts => {
-                            districts.forEach(district => {
-                                const option = document.createElement('option');
-                                option.value = district;
-                                option.textContent = district;
-                                districtSelector.appendChild(option);
-                            });
-                            districtSelector.disabled = false;
-                            hideLoading(geofenceLoading);
-                        })
-                        .catch(error => {
-                            console.error('Error fetching districts:', error);
-                            hideLoading(geofenceLoading);
-                        });
-                } else {
-                    districtSelector.disabled = true;
-                }
-            });
-
-            setGeofenceBtn.addEventListener('click', function() {
-                const state = stateSelector.value;
-                const district = districtSelector.value;
-                if (state && district) {
-                    showLoading(geofenceLoading);
-                    fetch('/api/set_geofence', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ state, district })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                showMessage('Geofence set successfully.');
-                                geofenceStatus.textContent = `Geofence active for ${district}, ${state}`;
-                                geofenceControls.classList.remove('geofence-inactive');
-                                geofenceControls.classList.add('geofence-active');
-                                removeGeofenceBtn.disabled = false;
-                                setGeofenceBtn.disabled = true;
-                                loadTerminals(state, district);
-                            } else {
-                                showMessage(data.message, true);
-                            }
-                            hideLoading(geofenceLoading);
-                        })
-                        .catch(error => {
-                            console.error('Error setting geofence:', error);
-                            showMessage('Error setting geofence.', true);
-                            hideLoading(geofenceLoading);
-                        });
-                } else {
-                    showMessage('Please select both state and district.', true);
-                }
-            });
-
-            removeGeofenceBtn.addEventListener('click', function() {
-                const state = stateSelector.value;
-                const district = districtSelector.value;
-                if (state && district) {
-                    showLoading(geofenceLoading);
-                    fetch('/api/remove_geofence', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ state, district })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                showMessage('Geofence removed successfully.');
-                                geofenceStatus.textContent = 'No active geofence.';
-                                geofenceControls.classList.remove('geofence-active');
-                                geofenceControls.classList.add('geofence-inactive');
-                                removeGeofenceBtn.disabled = true;
-                                setGeofenceBtn.disabled = false;
-                                terminalsList.innerHTML = '';
-                            } else {
-                                showMessage(data.message, true);
-                            }
-                            hideLoading(geofenceLoading);
-                        })
-                        .catch(error => {
-                            console.error('Error removing geofence:', error);
-                            showMessage('Error removing geofence.', true);
-                            hideLoading(geofenceLoading);
-                        });
-                } else {
-                    showMessage('Please select both state and district.', true);
-                }
-            });
-
-            function loadTerminals(state, district) {
-                showLoading(terminalLoading);
-                fetch(`/api/get-terminals-by-location?state=${state}&district=${district}`)
+            function loadStates() {
+                fetch('/api/states')
                     .then(response => response.json())
-                    .then(terminals => {
-                        terminalsList.innerHTML = '';
-                        terminals.forEach(terminal => {
-                            const li = document.createElement('li');
-                            li.textContent = `${terminal.Device_Id}: ${terminal.Latitude}, ${terminal.Longitude}`;
-                            terminalsList.appendChild(li);
+                    .then(states => {
+                        states.forEach(state => {
+                            const option = document.createElement('option');
+                            option.value = state;
+                            option.textContent = state;
+                            stateSelector.appendChild(option);
                         });
-                        hideLoading(terminalLoading);
+                    })
+                    .catch(error => console.error('Error loading states:', error));
+            }
+
+            function loadDistricts(state) {
+                districtSelector.innerHTML = '<option value="">Select District</option>';
+                districtSelector.disabled = !state;
+                if (!state) return;
+
+                fetch(`/api/districts?state=${state}`)
+                    .then(response => response.json())
+                    .then(districts => {
+                        districts.forEach(district => {
+                            const option = document.createElement('option');
+                            option.value = district;
+                            option.textContent = district;
+                            districtSelector.appendChild(option);
+                        });
+                        districtSelector.disabled = false;
+                    })
+                    .catch(error => console.error('Error loading districts:', error));
+            }
+
+            function updateGeofenceStatus() {
+    fetch('/api/active_geofence')
+        .then(response => response.json())
+        .then(data => {
+            if (data.active) {
+                geofenceStatus.textContent = `Active Geofence: ${data.state}, ${data.district}`;
+                removeGeofenceBtn.disabled = false;
+            } else {
+                geofenceStatus.textContent = 'No active geofence';
+                removeGeofenceBtn.disabled = true;
+            }
+        })
+        .catch(error => console.error('Error fetching active geofence:', error));
+}
+
+function updateTerminalStatus(deviceId, status) {
+    const terminalItem = terminalList.querySelector(`[data-device-id="${deviceId}"]`);
+    if (terminalItem) {
+        const statusSpan = terminalItem.querySelector('.terminal-status');
+        statusSpan.textContent = status;
+        statusSpan.className = `terminal-status ${status.toLowerCase()}`;
+    }
+}
+
+// Modify the loadTerminals function
+function loadTerminals() {
+    const state = stateSelector.value;
+    const district = districtSelector.value;
+    terminalLoading.style.display = 'inline';
+    terminalList.innerHTML = '';
+
+    fetch(`/api/terminals-by-location?state=${state}&district=${district}`)
+        .then(response => response.json())
+        .then(terminals => {
+            terminals.forEach(terminal => {
+                const terminalItem = document.createElement('div');
+                terminalItem.className = 'terminal-item';
+                terminalItem.innerHTML = `
+                    <span>${terminal.device_id}</span>
+                    <span class="terminal-status ${terminal.status.toLowerCase()}">${terminal.status}</span>
+                    <button class="toggle-terminal" data-device-id="${terminal.device_id}">
+                        Toggle Transmission
+                    </button>
+                `;
+                terminalList.appendChild(terminalItem);
+            });
+            terminalLoading.style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Error loading terminals:', error);
+            terminalLoading.style.display = 'none';
+            showMessage('error', 'Failed to load terminals');
+        });
+}
+
+// Modify the toggleTerminal function
+function toggleTerminal(deviceId) {
+    const button = terminalList.querySelector(`[data-device-id="${deviceId}"]`);
+    button.disabled = true;
+    fetch('/api/toggle_terminal', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ device_id: deviceId }),
+    })
+        .then(response => response.json())
+        .then(data => {
+            showMessage('success', data.message);
+            updateTerminalStatus(deviceId, data.status);
+        })
+        .catch(error => {
+            console.error('Error toggling terminal:', error);
+            showMessage('error', 'Failed to toggle terminal');
+        })
+        .finally(() => {
+            button.disabled = false;
+        });
+}
+
+            function setGeofence() {
+                const state = stateSelector.value;
+                const district = districtSelector.value;
+                if (!state || !district) {
+                    showMessage('error', 'Please select both state and district');
+                    return;
+                }
+
+                geofenceLoading.style.display = 'inline';
+                fetch('/api/set_geofence', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ state, district }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        showMessage('success', data.message);
+                        geofenceStatus.textContent = `Active Geofence: ${state}, ${district}`;
+                        removeGeofenceBtn.disabled = false;
+                        loadTerminals();
                     })
                     .catch(error => {
-                        console.error('Error fetching terminals:', error);
-                        showMessage('Error fetching terminals.', true);
-                        hideLoading(terminalLoading);
+                        console.error('Error setting geofence:', error);
+                        showMessage('error', 'Failed to set geofence');
+                    })
+                    .finally(() => {
+                        geofenceLoading.style.display = 'none';
                     });
             }
 
-            searchTerminal.addEventListener('input', function() {
-                const filter = searchTerminal.value.toLowerCase();
-                const terminalItems = terminalsList.getElementsByTagName('li');
-                Array.from(terminalItems).forEach(item => {
-                    const text = item.textContent || item.innerText;
-                    item.style.display = text.toLowerCase().includes(filter) ? '' : 'none';
+            function removeGeofence() {
+                const state = stateSelector.value;
+                const district = districtSelector.value;
+                if (!state || !district) {
+                    showMessage('error', 'Please select both state and district');
+                    return;
+                }
+
+                geofenceLoading.style.display = 'inline';
+                fetch('/api/remove_geofence', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ state, district }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        showMessage('success', data.message);
+                        geofenceStatus.textContent = '';
+                        removeGeofenceBtn.disabled = true;
+                        loadTerminals();
+                    })
+                    .catch(error => {
+                        console.error('Error removing geofence:', error);
+                        showMessage('error', 'Failed to remove geofence');
+                    })
+                    .finally(() => {
+                        geofenceLoading.style.display = 'none';
+                    });
+            }
+
+            function toggleTerminal(deviceId) {
+                fetch('/api/toggle_terminal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ device_id: deviceId }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        showMessage('success', data.message);
+                    })
+                    .catch(error => {
+                        console.error('Error toggling terminal:', error);
+                        showMessage('error', 'Failed to toggle terminal');
+                    });
+            }
+
+            stateSelector.addEventListener('change', () => {
+                loadDistricts(stateSelector.value);
+                loadTerminals();
+            });
+
+            districtSelector.addEventListener('change', loadTerminals);
+
+            setGeofenceBtn.addEventListener('click', setGeofence);
+            removeGeofenceBtn.addEventListener('click', removeGeofence);
+
+            terminalList.addEventListener('click', (event) => {
+                if (event.target.classList.contains('toggle-terminal')) {
+                    const deviceId = event.target.dataset.deviceId;
+                    toggleTerminal(deviceId);
+                }
+            });
+
+            searchTerminal.addEventListener('input', () => {
+                const searchTerm = searchTerminal.value.toLowerCase();
+                const terminalItems = terminalList.querySelectorAll('.terminal-item');
+                terminalItems.forEach(item => {
+                    const deviceId = item.querySelector('span').textContent.toLowerCase();
+                    item.style.display = deviceId.includes(searchTerm) ? 'flex' : 'none';
                 });
             });
 
-            socket.on('geofence_update', function(data) {
-                const { action, terminal } = data;
-                const terminalId = terminal.Device_Id;
-                const status = action === 'enter' ? 'Inactive' : 'Active';
-                const listItem = Array.from(terminalsList.getElementsByTagName('li')).find(li => li.textContent.includes(terminalId));
-                if (listItem) {
-                    listItem.textContent = `${terminalId}: ${terminal.Latitude}, ${terminal.Longitude} - ${status}`;
-                }
+            socket.on('geofence_update', (data) => {
+                showMessage('success', `Terminal ${data.device_id} ${data.action}ed geofence ${data.geofence}`);
+                loadTerminals();
             });
 
-            socket.on('status_update', function(data) {
-                const { device_id, status } = data;
-                const listItem = Array.from(terminalsList.getElementsByTagName('li')).find(li => li.textContent.includes(device_id));
-                if (listItem) {
-                    const [terminalInfo] = listItem.textContent.split(' - ');
-                    listItem.textContent = `${terminalInfo} - ${status.charAt(0).toUpperCase() + status.slice(1)}`;
-                }
-            });
+            loadStates();
+            updateGeofenceStatus();
+    setInterval(updateGeofenceStatus, 30000); // Update every 30 seconds
+
+    socket.on('terminal_status_update', (data) => {
+        updateTerminalStatus(data.device_id, data.status);
+    });
         });
     </script>
 </body>
